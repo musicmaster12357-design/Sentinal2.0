@@ -1,0 +1,20 @@
+import os
+from pydantic_settings import BaseSettings
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "scas.db")
+# Windows paths have backslashes which can mess up sqlalchemy URL parsing.
+DB_URL = f"sqlite+aiosqlite:///{DB_PATH.replace(os.sep, '/')}"
+
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "AttendEase Backend"
+    DATABASE_URL: str = DB_URL
+    SECRET_KEY: str = "supersecretkey_change_in_production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    QR_SECRET: str = "my_super_secret_qr_key_change_in_production"
+    
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
