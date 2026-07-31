@@ -8,10 +8,34 @@ app = FastAPI(
 )
 
 from app.config import settings
+from app.database import engine, Base, AsyncSessionLocal
+from app.models.faculty import Faculty
+from passlib.context import CryptContext
+from sqlalchemy.future import select
+
+@app.on_event("startup")
+async def startup_event():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        
+    async with AsyncSessionLocal() as db:
+        stmt = select(Faculty).where(Faculty.email == "faculty@test.com")
+        result = await db.execute(stmt)
+        if not result.scalars().first():
+            from app.api.auth import get_password_hash
+            hashed_password = get_password_hash("SCAMS@yenepoya!")
+            new_faculty = Faculty(
+                name="Test Faculty",
+                email="faculty@test.com",
+                password_hash=hashed_password,
+                department="Computer Science"
+            )
+            db.add(new_faculty)
+            await db.commit()
 
 # CORS configuration
 origins = [
-    settings.FRONTEND_URL,
+    "*",
 ]
 
 app.add_middleware(
