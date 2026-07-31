@@ -9,6 +9,9 @@ class QRScanRequest(BaseModel):
     expires: int
     signature: str
 
+class ManualAttendanceRequest(BaseModel):
+    campus_id: str
+
 class SessionFormRequest(BaseModel):
     session_id: int
     # Session Details

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
 from app.database import Base
 
 class Faculty(Base):
@@ -9,3 +9,5 @@ class Faculty(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     department = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
+    reset_token = Column(String, nullable=True, index=True)
+    reset_token_expires = Column(DateTime(timezone=True), nullable=True)

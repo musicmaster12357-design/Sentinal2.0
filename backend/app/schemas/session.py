@@ -6,6 +6,10 @@ class SessionCreate(BaseModel):
     subject: str
     semester: Optional[str] = None
     duration: Optional[int] = 60  # Default 60 minutes
+    time_slot: Optional[str] = None
+    session_date: Optional[str] = None
+    title: Optional[str] = None
+    speaker: Optional[str] = None
 
 class SessionResponse(BaseModel):
     id: int
@@ -15,6 +19,8 @@ class SessionResponse(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     current_qr: Optional[str] = None
+    title: Optional[str] = None
+    speaker: Optional[str] = None
 
     class Config:
         from_attributes = True

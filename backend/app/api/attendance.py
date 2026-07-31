@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.schemas.attendance import QRScanRequest, SessionFormRequest, AttendanceResponse
+from app.schemas.attendance import QRScanRequest, SessionFormRequest, AttendanceResponse, ManualAttendanceRequest
 from app.services.attendance_service import verify_and_start_workflow, complete_attendance_workflow
 from app.security.signatures import verify_qr_signature, is_qr_expired
 from app.models.session import AttendanceSession
@@ -89,6 +89,141 @@ async def scan_qr(data: QRScanRequest, db: AsyncSession = Depends(get_db), curre
         "workflow_state": record.workflow_state
     }
 
+@router.post("/session/{session_id}/manual")
+async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: AsyncSession = Depends(get_db), current_user: TokenData = Depends(get_current_faculty)):
+    from app.models.student import Student
+    from app.models.attendance import AttendanceRecord
+    from app.models.student_session_detail import StudentSessionDetail
+    from datetime import datetime, timezone
+    
+    # Verify session belongs to faculty
+    stmt = select(AttendanceSession).where(
+        AttendanceSession.id == session_id,
+        AttendanceSession.faculty_id == current_user.user_id,
+        AttendanceSession.status == "active",
+        AttendanceSession.is_active == True
+    )
+    res = await db.execute(stmt)
+    session = res.scalars().first()
+    
+    if not session:
+        raise HTTPException(status_code=400, detail="Invalid or inactive session.")
+        
+    # Find student by campus_id
+    student_stmt = select(Student).where(Student.campus_id == data.campus_id)
+    student_res = await db.execute(student_stmt)
+    student = student_res.scalars().first()
+    
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found with this Campus ID.")
+        
+    # Check if student already marked attendance
+    existing_attendance_stmt = select(AttendanceRecord).where(
+        AttendanceRecord.student_id == student.id,
+        AttendanceRecord.session_id == session.id,
+        AttendanceRecord.status == "present"
+    )
+    existing_attendance_res = await db.execute(existing_attendance_stmt)
+    if existing_attendance_res.scalars().first():
+        raise HTTPException(
+            status_code=403, 
+            detail="Student is already marked present."
+        )
+        
+    # Create attendance record
+    record = AttendanceRecord(
+        session_id=session.id,
+        student_id=student.id,
+        timestamp=datetime.now(timezone.utc),
+        status="present",
+        workflow_state="confirmed"
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    
+    # Create empty feedback
+    detail = StudentSessionDetail(
+        attendance_id=record.id,
+        issue_note=None
+    )
+    db.add(detail)
+    await db.commit()
+    
+    # Broadcast to faculty websocket
+    from app.websocket.attendance_socket import manager
+    await manager.broadcast_attendance_update(session.id, {
+        "student_id": student.id,
+        "name": student.name,
+        "email": student.email,
+        "department": student.department,
+        "course": student.course,
+        "specialisation": student.specialisation,
+        "semester": student.semester,
+        "campus_id": student.campus_id,
+        "time": (record.timestamp.isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.isoformat() if record.timestamp else None),
+        "status": record.status,
+        "interactive_rating": detail.interactive_rating,
+        "relevant_rating": detail.relevant_rating,
+        "learned_today": detail.learned_today,
+        "key_takeaway": detail.key_takeaway,
+        "overall_satisfaction": detail.overall_satisfaction
+    })
+    
+    return {"message": "Student marked present manually."}
+
+@router.delete("/session/{session_id}/student/{student_id}")
+async def remove_attendance(session_id: int, student_id: int, db: AsyncSession = Depends(get_db), current_user: TokenData = Depends(get_current_faculty)):
+    from app.models.attendance import AttendanceRecord
+    from app.models.student_session_detail import StudentSessionDetail
+    
+    # Verify session belongs to faculty
+    stmt = select(AttendanceSession).where(
+        AttendanceSession.id == session_id,
+        AttendanceSession.faculty_id == current_user.user_id,
+        AttendanceSession.status == "active"
+    )
+    res = await db.execute(stmt)
+    session = res.scalars().first()
+    
+    if not session:
+        raise HTTPException(status_code=400, detail="Invalid or inactive session.")
+        
+    # Find the attendance record
+    record_stmt = select(AttendanceRecord).where(
+        AttendanceRecord.student_id == student_id,
+        AttendanceRecord.session_id == session.id
+    )
+    record_res = await db.execute(record_stmt)
+    record = record_res.scalars().first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found.")
+        
+    # Delete the student session detail (feedback) if exists
+    detail_stmt = select(StudentSessionDetail).where(StudentSessionDetail.attendance_id == record.id)
+    detail_res = await db.execute(detail_stmt)
+    detail = detail_res.scalars().first()
+    
+    if detail:
+        await db.delete(detail)
+        
+    # Delete the attendance record
+    await db.delete(record)
+    await db.commit()
+    
+    # Broadcast to faculty websocket to remove student
+    from app.websocket.attendance_socket import manager
+    # We will send a special type of message: "attendance_removed"
+    # To do this safely without modifying the websocket manager, we'll just broadcast an update with status="removed"
+    # and let the frontend filter them out.
+    await manager.broadcast_attendance_update(session.id, {
+        "student_id": student_id,
+        "status": "removed"
+    })
+    
+    return {"message": "Student removed from session."}
+
 @router.post("/feedback", response_model=dict)
 async def submit_feedback(data: SessionFormRequest, db: AsyncSession = Depends(get_db), current_user: TokenData = Depends(get_current_student)):
     from app.models.attendance import AttendanceRecord
@@ -149,49 +284,59 @@ async def submit_feedback(data: SessionFormRequest, db: AsyncSession = Depends(g
 async def get_attendance_history(db: AsyncSession = Depends(get_db), current_user: TokenData = Depends(get_current_student)):
     from app.models.attendance import AttendanceRecord
     from app.models.session import AttendanceSession
-    from app.models.student_session_detail import StudentSessionDetail
-    
-    stmt = select(AttendanceRecord, AttendanceSession, StudentSessionDetail).join(
-        AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-    ).outerjoin(
-        StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id
-    ).where(
-        AttendanceRecord.student_id == current_user.user_id
-    ).order_by(AttendanceRecord.timestamp.desc())
-    
-    res = await db.execute(stmt)
-    records = res.all()
-    
-    history = []
-    for record, session, detail in records:
-        has_feedback = bool(detail and detail.interactive_rating and detail.interactive_rating > 0)
-        history.append({
-            "id": record.id,
-            "session_id": session.id,
-            "subject_id": session.subject_id,
-            "date": (record.timestamp.isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.isoformat() if record.timestamp else None),
-            "status": record.status,
-            "has_feedback": has_feedback
-        })
-        
     from app.models.student import Student
     from sqlalchemy import func
     
+    # 1. Get the current student
     student_res = await db.execute(select(Student).where(Student.id == current_user.user_id))
     student = student_res.scalar_one_or_none()
     
-    percentage = 100
-    if student and student.semester:
-        total_stmt = select(func.count(AttendanceSession.id)).where(
-            AttendanceSession.semester == student.semester,
-            AttendanceSession.status == 'closed'
-        )
-        total_res = await db.execute(total_stmt)
-        total_sessions = total_res.scalar() or 0
+    if not student:
+        return {"history": [], "percentage": 0}
         
-        if total_sessions > 0:
-            # attended sessions are just len(records)
-            percentage = round((len(records) / total_sessions) * 100)
+    # 2. Find all sessions that this student should have attended based on semester
+    session_stmt = select(AttendanceSession).where(
+        AttendanceSession.semester == student.semester
+    ).order_by(AttendanceSession.start_time.desc())
+    
+    session_res = await db.execute(session_stmt)
+    sessions = session_res.scalars().all()
+    
+    # 3. Find all attendance records for this student
+    record_stmt = select(AttendanceRecord).where(AttendanceRecord.student_id == student.id)
+    record_res = await db.execute(record_stmt)
+    records = record_res.scalars().all()
+    
+    # Map session_id to record for quick lookup
+    record_map = {r.session_id: r for r in records}
+    
+    history = []
+    attended_count = 0
+    
+    for session in sessions:
+        record = record_map.get(session.id)
+        if record:
+            attended_count += 1
+            status = record.status
+            timestamp = record.timestamp
+        else:
+            status = "absent"
+            timestamp = session.start_time
+            
+        history.append({
+            "id": record.id if record else f"missing-{session.id}",
+            "session_id": session.id,
+            "subject_id": session.subject_id,
+            "date": (timestamp.isoformat() + "Z") if timestamp and not timestamp.tzinfo else (timestamp.isoformat() if timestamp else None),
+            "status": status,
+            "has_feedback": False # Assuming false for absent, could query detail if needed
+        })
+        
+    percentage = 0
+    if len(sessions) > 0:
+        percentage = round((attended_count / len(sessions)) * 100)
+
+    return {"history": history, "percentage": percentage}
 
     return {"history": history, "percentage": percentage}
 
@@ -271,6 +416,7 @@ async def get_faculty_sessions(db: AsyncSession = Depends(get_db), current_user:
     
     res = await db.execute(stmt)
     sessions = res.scalars().all()
+    # Removed auto-close logic because we want sessions to remain open until explicitly closed by the faculty.
     
     return [{
         "id": s.id,
@@ -324,6 +470,9 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: To
     from app.models.student import Student
     from app.models.student_session_detail import StudentSessionDetail
     from app.models.session import AttendanceSession
+    from datetime import timezone, timedelta
+
+    IST = timezone(timedelta(hours=5, minutes=30))
 
     stmt = select(AttendanceRecord, Student, StudentSessionDetail, AttendanceSession).join(
         Student, AttendanceRecord.student_id == Student.id
@@ -339,17 +488,25 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: To
     res = await db.execute(stmt)
     records = res.all()
 
+    def to_ist_iso(dt):
+        if not dt: return None
+        # SQLite stores naive datetimes which are actually UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(IST).isoformat()
+
     return [{
         "student_name": s.name,
         "campus_id": s.campus_id,
+        "session_id": sess.id,
         "subject_id": sess.subject_id,
-        "session_date": sess.start_time.isoformat() if sess.start_time else None,
+        "session_date": to_ist_iso(sess.start_time),
         "interactive_rating": d.interactive_rating,
         "relevant_rating": d.relevant_rating,
         "learned_today": d.learned_today,
         "key_takeaway": d.key_takeaway,
         "overall_satisfaction": d.overall_satisfaction,
-        "submitted_time": d.submitted_time.isoformat() if d.submitted_time else None,
+        "submitted_time": to_ist_iso(d.submitted_time),
         "email": s.email,
         "phone": s.phone,
         "course": s.course,

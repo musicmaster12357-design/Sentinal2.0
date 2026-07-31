@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Star, User, Calendar, Loader2, AlertCircle, X, Mail, Phone, BookOpen, ChevronRight } from 'lucide-react';
+import { MessageSquare, Star, User, Calendar, Loader2, AlertCircle, X, Mail, Phone, BookOpen, ChevronRight, Download } from 'lucide-react';
 import api from '../../services/api';
-import FacultyLayout from './FacultyLayout';
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
 
 export default function FacultyFeedback() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
 
   useEffect(() => {
     const fetchFeedbacks = async () => {
@@ -37,74 +38,185 @@ export default function FacultyFeedback() {
     );
   };
 
+  // Group by Date
+  const groupedByDate = feedbacks.reduce((acc, fb) => {
+    const dateStr = fb.session_date ? new Date(fb.session_date).toISOString().split('T')[0] : 'Unknown Date';
+    if (!acc[dateStr]) acc[dateStr] = [];
+    acc[dateStr].push(fb);
+    return acc;
+  }, {});
+
+  const uniqueDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+  
+  useEffect(() => {
+    if (uniqueDates.length > 0 && !selectedDate) {
+      setSelectedDate(uniqueDates[0]);
+    }
+  }, [uniqueDates, selectedDate]);
+
+  const handleSelectDate = (date) => {
+    setSelectedDate(date);
+  };
+
+  const selectedFeedbacks = selectedDate ? groupedByDate[selectedDate] : [];
+  
+  const groupedBySession = selectedFeedbacks.reduce((acc, fb) => {
+    if (!acc[fb.session_id]) acc[fb.session_id] = { session_id: fb.session_id, subject_id: fb.subject_id, session_date: fb.session_date, items: [] };
+    acc[fb.session_id].items.push(fb);
+    return acc;
+  }, {});
+
   return (
-    <FacultyLayout title="Session Feedbacks">
-      <div className="space-y-6 relative z-10 max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-6">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <MessageSquare className="text-amber-400" /> Student Feedback
-          </h2>
-          <p className="text-slate-400 text-sm mt-1">Review structured feedback submitted by students across all your sessions.</p>
+    <DashboardLayout title="Session Feedbacks" role="faculty">
+      <div className="flex flex-col lg:flex-row gap-6 relative z-10 max-w-7xl mx-auto h-[calc(100vh-120px)]">
+        
+        {/* Left Pane: Dates List */}
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="w-full lg:w-1/4 glass-panel flex flex-col h-full overflow-hidden">
+          <div className="p-6 border-b border-slate-700/50 bg-slate-900/50">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Calendar className="text-amber-400" /> Day-by-Day
+            </h2>
+            <p className="text-slate-400 text-sm mt-1">Select a date to view feedbacks</p>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            {loading ? (
+              <div className="flex justify-center items-center h-32 text-slate-400">
+                <Loader2 className="animate-spin mr-2" size={20} /> Loading...
+              </div>
+            ) : uniqueDates.length === 0 ? (
+              <div className="text-center p-6 text-slate-500 text-sm">
+                No feedbacks found.
+              </div>
+            ) : (
+              uniqueDates.map(date => (
+                <div 
+                  key={date} 
+                  onClick={() => handleSelectDate(date)}
+                  className={`p-4 rounded-xl cursor-pointer border transition-all flex justify-between items-center ${selectedDate === date ? 'bg-amber-600/20 border-amber-500/50 shadow-lg shadow-amber-900/20 text-amber-300' : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/60 text-slate-300'}`}
+                >
+                  <h3 className="font-semibold text-slate-200">{date === 'Unknown Date' ? date : new Date(date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+                  <span className="text-xs bg-slate-800 px-2 py-1 rounded-md">{groupedByDate[date].length}</span>
+                </div>
+              ))
+            )}
+          </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          {loading ? (
-            <div className="p-12 flex justify-center items-center text-slate-400 gap-3 glass-panel">
-              <Loader2 className="animate-spin" size={24} /> Loading feedbacks...
-            </div>
-          ) : feedbacks.length === 0 ? (
-            <div className="p-12 flex flex-col items-center justify-center text-slate-500 gap-4 glass-panel">
-              <AlertCircle size={48} className="opacity-30" />
-              <p className="text-lg font-medium">No feedback received yet.</p>
-              <p className="text-sm">Students will be prompted to leave feedback after checking in.</p>
+        {/* Right Pane: Feedbacks */}
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full lg:w-3/4 glass-panel flex flex-col h-full overflow-hidden">
+          {!selectedDate ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+              <MessageSquare size={64} className="opacity-20 mb-4" />
+              <p className="text-xl font-medium text-slate-400">Select a Date</p>
+              <p>Choose a date from the left to view session feedbacks</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <AnimatePresence>
-                {feedbacks.map((fb, i) => (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.05 }}
-                    key={i}
-                    onClick={() => setSelectedFeedback(fb)}
-                    className="glass-panel p-6 flex flex-col h-full bg-slate-800/30 hover:bg-slate-800/50 transition-all cursor-pointer group hover:border-slate-600"
+            <>
+              <div className="p-6 border-b border-slate-700/50 bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    {selectedDate === 'Unknown Date' ? selectedDate : new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </h2>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {Object.keys(groupedBySession).length} session(s) on this date
+                  </p>
+                </div>
+                
+                {selectedDate !== 'Unknown Date' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await api.get(`/attendance/faculty/export/feedback/excel/date/${selectedDate}`, { responseType: 'blob' });
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `Feedbacks_${selectedDate}.xlsx`;
+                        document.body.appendChild(link);
+                        link.click();
+                        window.URL.revokeObjectURL(url);
+                        link.remove();
+                      } catch (err) {
+                        alert("Failed to download feedback excel.");
+                      }
+                    }}
+                    className="btn-primary flex items-center justify-center gap-2 text-sm py-2 px-4 shadow-lg shadow-amber-600/20"
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500/20 to-orange-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-                          <User size={18} />
+                    <Download size={16} />
+                    Download All Feedbacks (Excel)
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                {Object.keys(groupedBySession).length === 0 ? (
+                  <div className="text-center p-12 text-slate-500">
+                    No feedbacks available for this date.
+                  </div>
+                ) : (
+                  <div className="space-y-10">
+                    {Object.values(groupedBySession).map((group, groupIdx) => (
+                      <div key={group.session_id} className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-700/50">
+                          <div>
+                            <h3 className="text-xl font-bold text-slate-200 flex items-center gap-2">
+                              {group.subject_id}
+                            </h3>
+                            <p className="text-slate-400 text-sm">
+                              {group.session_date ? new Date(group.session_date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'Unknown Time'} • {group.items.length} Feedback{group.items.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-slate-200">{fb.student_name}</p>
-                          <p className="text-xs text-slate-500 font-mono">{fb.campus_id}</p>
+                        
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                          <AnimatePresence>
+                            {group.items.map((fb, i) => (
+                              <motion.div 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: i * 0.05 }}
+                                key={i}
+                                onClick={() => setSelectedFeedback(fb)}
+                                className="glass-panel p-6 flex flex-col h-full bg-slate-800/30 hover:bg-slate-800/50 transition-all cursor-pointer group hover:border-slate-600"
+                              >
+                                <div className="flex justify-between items-start mb-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500/20 to-orange-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                                      <User size={18} />
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-slate-200 truncate max-w-[150px]" title={fb.student_name}>{fb.student_name}</p>
+                                      <p className="text-xs text-slate-500 font-mono">{fb.campus_id}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-slate-400">Overall:</span>
+                                    {renderStars(fb.overall_satisfaction)}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex-1 space-y-3">
+                                  <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-700/50 line-clamp-2 text-sm italic text-slate-300">
+                                    <span className="text-slate-500 text-xs font-semibold uppercase not-italic block mb-1">Key Takeaway</span>
+                                    "{fb.key_takeaway}"
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-5 pt-4 border-t border-slate-700/50 flex justify-end items-center text-xs text-slate-400">
+                                  <div className="flex items-center gap-1.5 text-blue-400 font-medium group-hover:text-blue-300 transition-colors">
+                                    View Full Details <ChevronRight size={14} />
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-400">Overall:</span>
-                        {renderStars(fb.overall_satisfaction)}
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1 space-y-3">
-                      <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-700/50 line-clamp-2 text-sm italic text-slate-300">
-                        <span className="text-slate-500 text-xs font-semibold uppercase not-italic block mb-1">Key Takeaway</span>
-                        "{fb.key_takeaway}"
-                      </div>
-                    </div>
-                    
-                    <div className="mt-5 pt-4 border-t border-slate-700/50 flex flex-wrap justify-between items-center text-xs text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-slate-300">Session:</span> {fb.subject_id}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-blue-400 font-medium group-hover:text-blue-300 transition-colors">
-                        View Full Details <ChevronRight size={14} />
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </motion.div>
       </div>
@@ -225,6 +337,6 @@ export default function FacultyFeedback() {
           </div>
         )}
       </AnimatePresence>
-    </FacultyLayout>
+    </DashboardLayout>
   );
 }

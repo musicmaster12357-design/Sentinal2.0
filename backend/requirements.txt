@@ -12,4 +12,7 @@ qrcode[pil]
 aiosqlite
 alembic
 email-validator
-
+python-dotenv
+openpyxl
+pytz
+ollama

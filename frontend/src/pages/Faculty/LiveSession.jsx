@@ -1,40 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, StopCircle, CheckCircle2, AlertCircle, Clock, Timer } from 'lucide-react';
+import { Users, StopCircle, CheckCircle2, AlertCircle, Clock, Timer, X } from 'lucide-react';
 import api from '../../services/api';
 
 // Timing component
 function SessionTimings({ startTime, endTime }) {
-  const [remaining, setRemaining] = useState('');
-  const [isExpired, setIsExpired] = useState(false);
-
-  useEffect(() => {
-    if (!endTime) return;
-
-    const checkExpiry = () => {
-      const now = Date.now();
-      const utcEndStr = endTime.endsWith('Z') ? endTime : endTime + 'Z';
-      const end = new Date(utcEndStr).getTime();
-      const diff = Math.max(0, Math.floor((end - now) / 1000));
-
-      if (diff === 0) {
-        setIsExpired(true);
-        setRemaining('00:00:00');
-        return;
-      }
-
-      const h = Math.floor(diff / 3600).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
-      const s = (diff % 60).toString().padStart(2, '0');
-      setRemaining(`${h}:${m}:${s}`);
-    };
-
-    checkExpiry();
-    const interval = setInterval(checkExpiry, 1000);
-    return () => clearInterval(interval);
-  }, [endTime]);
-
   const formatTime = (timeStr) => {
     if (!timeStr) return '';
     const utcStr = timeStr.endsWith('Z') ? timeStr : timeStr + 'Z';
@@ -45,17 +16,13 @@ function SessionTimings({ startTime, endTime }) {
   const formattedEnd = formatTime(endTime);
 
   return (
-    <div className={`flex flex-col items-center gap-1 mt-4 px-5 py-3 rounded-xl font-mono
-      ${isExpired
-        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-      }`}>
+    <div className="flex flex-col items-center gap-1 mt-4 px-5 py-3 rounded-xl font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
       <div className="flex items-center gap-2 text-lg font-bold">
         <Timer size={20} />
-        <span>{isExpired ? 'Session Expired' : `Expires in ${remaining}`}</span>
+        <span>Active Session</span>
       </div>
       <div className="text-sm font-medium opacity-80 flex items-center gap-1">
-        <Clock size={14} /> {formattedStart} - {formattedEnd}
+        <Clock size={14} /> Allotted: {formattedStart} - {formattedEnd}
       </div>
     </div>
   );
@@ -65,9 +32,11 @@ export default function LiveSession() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [qrToken, setQrToken] = useState(null);
+  const [sessionInfo, setSessionInfo] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [attendees, setAttendees] = useState([]);
+  const [manualCampusId, setManualCampusId] = useState('');
   const wsRef = useRef(null);
 
   // Build the QR string from the static token
@@ -88,10 +57,16 @@ export default function LiveSession() {
       if (response.data.start_time) setStartTime(response.data.start_time);
       if (response.data.end_time) setEndTime(response.data.end_time);
       if (response.data.attendees) setAttendees(response.data.attendees);
+
+      const infoRes = await api.get(`/session/${id}/info`);
+      setSessionInfo(infoRes.data);
     } catch (err) {
       console.error("Polling failed", err);
+      if (err.response && err.response.status === 404) {
+        navigate('/faculty/dashboard');
+      }
     }
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     let ws = null;
@@ -107,10 +82,14 @@ export default function LiveSession() {
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === 'attendance_update') {
-          setAttendees(prev => {
-            if (prev.find(a => a.email === msg.data.email)) return prev;
-            return [msg.data, ...prev];
-          });
+          if (msg.data.status === 'removed') {
+            setAttendees(prev => prev.filter(a => a.student_id !== msg.data.student_id));
+          } else {
+            setAttendees(prev => {
+              if (prev.find(a => a.student_id === msg.data.student_id)) return prev;
+              return [msg.data, ...prev];
+            });
+          }
         }
       };
 
@@ -150,8 +129,16 @@ export default function LiveSession() {
       {/* ── QR Panel ── */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 relative z-10">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <div className="badge badge-active mb-4 inline-block">Active Session</div>
-          <h2 className="text-4xl font-bold text-white mb-2">Scan to join</h2>
+          <div className="badge badge-active mb-4 inline-block">Active Session: {sessionInfo?.subject_id}</div>
+          {sessionInfo?.title && (
+             <h2 className="text-4xl font-bold text-white mb-2">{sessionInfo.title}</h2>
+          )}
+          {!sessionInfo?.title && (
+             <h2 className="text-4xl font-bold text-white mb-2">Scan to join</h2>
+          )}
+          {sessionInfo?.speaker && (
+             <p className="text-blue-400 text-lg font-medium mb-2">Speaker: {sessionInfo.speaker}</p>
+          )}
           <p className="text-slate-400 text-sm">QR is valid for the entire session duration.</p>
         </motion.div>
 
@@ -204,6 +191,36 @@ export default function LiveSession() {
 
             <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
               <CheckCircle2 size={16} /> Secure session active
+            </div>
+            
+            {/* Manual Check-in */}
+            <div className="mt-4 w-full border-t border-slate-700 pt-4 flex flex-col gap-2">
+              <span className="text-xs text-slate-400 font-medium text-center">Manual Check-in</span>
+              <form 
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!manualCampusId.trim()) return;
+                  try {
+                    await api.post(`/attendance/session/${id}/manual`, { campus_id: manualCampusId.trim().toUpperCase() });
+                    setManualCampusId('');
+                    // No need to alert, websocket handles updates!
+                  } catch (err) {
+                    alert(err.response?.data?.detail || "Failed to mark attendance manually");
+                  }
+                }}
+                className="flex items-center w-full gap-2"
+              >
+                <input 
+                  type="text" 
+                  placeholder="Enter Campus ID" 
+                  value={manualCampusId}
+                  onChange={(e) => setManualCampusId(e.target.value)}
+                  className="bg-black/40 border border-white/10 rounded-lg text-sm text-white px-3 py-2 flex-1 outline-none focus:border-blue-500/50"
+                />
+                <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                  Add
+                </button>
+              </form>
             </div>
           </div>
         </motion.div>
@@ -258,11 +275,29 @@ export default function LiveSession() {
                         <p className="text-xs text-blue-400/70 mt-0.5">{a.specialisation}</p>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-1">
                       <span className="text-xs bg-black/30 px-2 py-1 rounded text-slate-300 block">
                         {a.time ? new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}
                       </span>
-                      <span className="text-[10px] text-emerald-400 mt-1 block">✅ Present</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-emerald-400">✅ Present</span>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(`Are you sure you want to remove ${a.name || a.campus_id} from this session?`)) return;
+                            try {
+                              await api.delete(`/attendance/session/${id}/student/${a.student_id}`);
+                              // Frontend update handled by websocket
+                            } catch (err) {
+                              alert(err.response?.data?.detail || "Failed to remove student");
+                            }
+                          }}
+                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 p-1 rounded transition-colors"
+                          title="Remove student"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

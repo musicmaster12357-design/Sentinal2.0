@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, Star, Send, Loader2, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
 
 export default function FeedbackForm() {
   const { sessionId } = useParams();
@@ -81,9 +82,8 @@ export default function FeedbackForm() {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-y-auto py-12 custom-scrollbar">
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-600/10 rounded-full blur-[100px] pointer-events-none" />
+    <DashboardLayout role="student" title="Session Feedback">
+      <div className="flex items-center justify-center relative overflow-y-auto h-full w-full">
       
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-lg mx-4 my-8">
         <div className="glass-panel p-6 sm:p-8">
@@ -164,6 +164,7 @@ export default function FeedbackForm() {
           </form>
         </div>
       </motion.div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

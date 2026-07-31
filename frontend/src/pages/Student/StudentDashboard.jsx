@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { QrCode, Clock, CheckCircle, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { QrCode, Clock, CheckCircle, AlertCircle, Loader2, ChevronRight, Lock, Book, ShieldCheck } from 'lucide-react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { toast } from '../../store/toastStore';
 
 export default function StudentDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState([]);
-  const [stats, setStats] = useState({ percentage: 100, todayClasses: [] }); // Stub percentage/today for now
-  const location = useLocation();
-  const [showSuccessBanner, setShowSuccessBanner] = useState(location.state?.attendanceSuccess || false);
+  const [stats, setStats] = useState({ percentage: 100, todayClasses: [] }); 
 
-  useEffect(() => {
-    if (showSuccessBanner) {
-      const timer = setTimeout(() => setShowSuccessBanner(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showSuccessBanner]);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -30,182 +35,171 @@ export default function StudentDashboard() {
         setLoading(false);
       } catch (err) {
         console.error("Failed to load history", err);
+        toast.error("Failed to load attendance history");
         setLoading(false);
       }
     };
     fetchStats();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-500" size={48} />
-      </div>
-    );
-  }
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.warning("New passwords do not match");
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    try {
+      const res = await api.post('/auth/change-password', {
+        old_password: oldPassword,
+        new_password: newPassword
+      });
+      toast.success(res.data.message);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to update password");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   return (
-    <div className="pb-20 md:pb-0 h-full overflow-y-auto custom-scrollbar">
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        {showSuccessBanner && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <CheckCircle size={24} />
+    <DashboardLayout title="Student Portal" role="student">
+      <div className="space-y-8">
+        
+        {/* Hero Card */}
+        <Card className="bg-primary/5 border-primary/20 relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="absolute top-[-50%] right-[-10%] w-[40%] h-[150%] bg-primary/20 rounded-full blur-[100px] pointer-events-none"></div>
+          
+          <div className="flex-1 z-10 min-w-0 pr-4">
+             <Badge variant="primary" className="mb-4 inline-block">Welcome Back</Badge>
+             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 truncate" title={user?.name}>{user?.name}</h1>
+             <p className="text-text-secondary text-sm sm:text-lg truncate">{user?.course} • Semester {user?.semester}</p>
+          </div>
+          
+          {loading ? (
+             <Skeleton variant="circular" className="w-32 h-32" />
+          ) : (
+            <div className="bg-surface/50 border border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center min-w-[200px] z-10 shadow-lg">
+              <div className="relative w-20 h-20 flex items-center justify-center mb-2">
+                <svg className="w-full h-full transform -rotate-90 absolute inset-0 drop-shadow-[0_0_8px_rgba(0,240,255,0.5)]" viewBox="0 0 36 36">
+                  <path
+                    className="text-white/10"
+                    strokeWidth="3"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className="text-primary transition-all duration-1000 ease-out"
+                    strokeDasharray={`${stats.percentage}, 100`}
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <span className="text-xl font-bold text-white relative z-10">{stats.percentage}%</span>
               </div>
-              <div>
-                <h3 className="text-emerald-400 font-bold">Attendance Marked!</h3>
-                <p className="text-sm text-emerald-200/70">Your attendance has been recorded successfully.</p>
+              <p className="font-semibold text-text-primary">Overall Attendance</p>
+            </div>
+          )}
+        </Card>
+
+        {/* Quick Actions */}
+        <section>
+          <Button 
+            onClick={() => navigate('/scanner')}
+            variant="primary"
+            className="w-full p-4 sm:p-8 flex items-center justify-between group text-xl overflow-hidden"
+          >
+            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
+                <QrCode size={24} className="text-white sm:w-7 sm:h-7" />
+              </div>
+              <div className="text-left text-white flex-1 min-w-0 pr-2">
+                <h3 className="font-bold text-lg sm:text-xl truncate">Scan QR Code</h3>
+                <p className="text-xs sm:text-sm font-normal opacity-80 truncate">Mark your attendance for the current lecture</p>
               </div>
             </div>
-          </motion.div>
-        )}
+            <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+              <ChevronRight size={20} className="text-white sm:w-6 sm:h-6" />
+            </div>
+          </Button>
+        </section>
 
-        {/* Welcome Section */}
-        <section className="mb-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
-          >
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Welcome back, {user?.name?.split(' ')[0] || 'Student'}! 👋</h1>
-              <p className="text-slate-400">{user?.course} • Semester {user?.semester}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* History Section */}
+          <Card className="flex flex-col h-[500px]">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Clock size={20} className="text-secondary" /> Recent Attendance
+              </h2>
             </div>
             
-            <div className="bg-[#1e293b] border border-slate-700/50 rounded-2xl p-4 flex items-center gap-4 min-w-[200px]">
-              <div className="w-14 h-14 rounded-full border-4 border-blue-500 flex items-center justify-center">
-                <span className="text-lg font-bold text-white">{stats.percentage}%</span>
-              </div>
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              {loading ? (
+                <div className="space-y-4">
+                   {Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : history.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center opacity-50">
+                  <Book size={48} className="text-text-muted mb-4" />
+                  <p className="text-text-secondary">No attendance records yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {history.map((record) => (
+                    <div key={record.session_id} className="p-4 rounded-xl bg-surface/50 border border-white/5 flex justify-between items-center hover:border-white/10 transition-colors">
+                      <div>
+                        <h4 className="font-medium text-white">{record.subject_id || record.subject}</h4>
+                        <p className="text-sm text-text-muted mt-0.5">
+                          {new Date(record.date || record.session_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant={record.status === 'absent' ? 'error' : 'success'}>
+                        {record.status === 'absent' ? 'Absent' : 'Present'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Security Settings */}
+          <Card>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+              <Lock size={20} className="text-accent" /> Security Settings
+            </h2>
+            <form onSubmit={handleChangePassword} className="space-y-5">
               <div>
-                <p className="text-sm text-slate-400">Overall</p>
-                <p className="font-semibold text-slate-200">Attendance</p>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Current Password</label>
+                <Input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} required />
               </div>
-            </div>
-          </motion.div>
-        </section>
-
-        {/* Action Buttons */}
-        <section className="mb-10">
-          <motion.button 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
-            onClick={() => navigate('/scanner')}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 p-6 rounded-2xl flex items-center justify-between shadow-lg shadow-blue-900/20 group transition-all"
-          >
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                <QrCode size={32} className="text-white" />
-              </div>
-              <div className="text-left">
-                <h3 className="text-xl font-bold text-white mb-1">Scan Attendance</h3>
-                <p className="text-blue-100/80 text-sm">Join a live session right now</p>
-              </div>
-            </div>
-            <ChevronRight size={24} className="text-white opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </motion.button>
-        </section>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Today's Classes */}
-          <section>
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Clock size={20} className="text-blue-400" /> Today's Schedule
-            </h3>
-            <div className="space-y-3">
-              {stats.todayClasses.length === 0 ? (
-                <div className="bg-[#1e293b] border border-slate-700/50 p-6 rounded-xl text-center text-slate-400">
-                  <p>No upcoming classes today.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">New Password</label>
+                  <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} />
                 </div>
-              ) : (
-                stats.todayClasses.map((cls, idx) => (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + (idx * 0.1) }}
-                    key={cls.id} 
-                    className="bg-[#1e293b] border border-slate-700/50 p-4 rounded-xl flex items-center justify-between"
-                  >
-                    <div>
-                      <h4 className="font-semibold text-slate-200">{cls.subject}</h4>
-                      <p className="text-sm text-slate-400">{cls.time}</p>
-                    </div>
-                    <div>
-                      {cls.status === 'Pending' ? (
-                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                          <AlertCircle size={12} /> Pending
-                        </span>
-                      ) : (
-                        <span className="bg-slate-700/50 text-slate-400 px-3 py-1 rounded-full text-xs font-medium">
-                          Upcoming
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* Recent History */}
-          <section>
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <CheckCircle size={20} className="text-emerald-400" /> Recent History
-            </h3>
-            <div className="space-y-3">
-              {history.length === 0 ? (
-                <div className="bg-[#1e293b] border border-slate-700/50 p-6 rounded-xl text-center text-slate-400">
-                  <p>No attendance records found.</p>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Confirm New Password</label>
+                  <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={8} />
                 </div>
-              ) : (
-                history.map((record, idx) => (
-                  <motion.div 
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + (idx * 0.1) }}
-                    key={record.id} 
-                    className="bg-[#1e293b] border border-slate-700/50 p-4 rounded-xl flex items-center justify-between flex-wrap gap-4"
-                  >
-                    <div>
-                      <h4 className="font-semibold text-slate-200">{record.subject_id}</h4>
-                      <p className="text-sm text-slate-400">
-                        {new Date(record.date).toLocaleDateString()} • {record.lecture_hall || 'Unknown'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {record.status === 'present' ? (
-                        <>
-                          {!record.has_feedback && (
-                            <button 
-                              onClick={() => navigate(`/student/feedback/${record.session_id}`)}
-                              className="text-xs bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/30 px-3 py-1 rounded-full font-medium transition-colors"
-                            >
-                              Give Feedback
-                            </button>
-                          )}
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-medium">
-                            Present
-                          </span>
-                        </>
-                      ) : (
-                        <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-1 rounded-full text-xs font-medium">
-                          Absent
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </section>
+              </div>
+              <Button type="submit" variant="secondary" className="w-full mt-4" disabled={isChangingPassword}>
+                {isChangingPassword ? 'Updating...' : 'Update Password'}
+              </Button>
+            </form>
+          </Card>
         </div>
-      </main>
-    </div>
+
+      </div>
+    </DashboardLayout>
   );
 }

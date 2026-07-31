@@ -47,10 +47,66 @@ def _generate_static_qr_token(session_id: int, expires: int) -> str:
 @router.post("/start", response_model=SessionResponse)
 async def start_session(data: SessionCreate, faculty: Faculty = Depends(get_current_faculty), db: AsyncSession = Depends(get_db)):
     from datetime import datetime, timezone, timedelta
+    import pytz
     
-    start_time = datetime.now(timezone.utc)
-    end_time = start_time + timedelta(minutes=data.duration) if data.duration else start_time + timedelta(hours=2)
-    expires_unix = int(end_time.timestamp())
+    IST = pytz.timezone('Asia/Kolkata')
+    
+    if data.time_slot:
+        # e.g. "09:30-11:00", "01:30-03:30"
+        # Since it's a fixed list, we can parse it easily
+        try:
+            start_str, end_str = data.time_slot.split('-')
+            
+            # Helper to parse "01:30" or "11:00" into hours and minutes
+            def parse_time(t_str):
+                h, m = map(int, t_str.split(':'))
+                return h, m
+
+            sh, sm = parse_time(start_str)
+            eh, em = parse_time(end_str)
+            
+            now_ist = datetime.now(IST)
+            if data.session_date:
+                # Expecting YYYY-MM-DD
+                try:
+                    yr, mo, da = map(int, data.session_date.split('-'))
+                    now_ist = now_ist.replace(year=yr, month=mo, day=da)
+                except Exception:
+                    pass
+            
+            start_time_ist = now_ist.replace(hour=sh, minute=sm, second=0, microsecond=0)
+            end_time_ist = now_ist.replace(hour=eh, minute=em, second=0, microsecond=0)
+            
+            start_time = start_time_ist.astimezone(timezone.utc)
+            end_time = end_time_ist.astimezone(timezone.utc)
+        except Exception:
+            # Fallback
+            start_time = datetime.now(timezone.utc)
+            end_time = start_time + timedelta(minutes=data.duration) if data.duration else start_time + timedelta(hours=2)
+    else:
+        start_time = datetime.now(timezone.utc)
+        if data.session_date:
+            try:
+                yr, mo, da = map(int, data.session_date.split('-'))
+                start_time = start_time.replace(year=yr, month=mo, day=da)
+            except Exception:
+                pass
+        end_time = start_time + timedelta(minutes=data.duration) if data.duration else start_time + timedelta(hours=2)
+        
+    # Set QR expiration to 10 years in the future so it doesn't expire until session is closed manually
+    expires_unix = int((start_time + timedelta(days=3650)).timestamp())
+
+    # Auto-close any previously active sessions
+    stmt_close = select(AttendanceSession).where(AttendanceSession.faculty_id == faculty.id, AttendanceSession.status == "active")
+    res_close = await db.execute(stmt_close)
+    active_sessions = res_close.scalars().all()
+    for s in active_sessions:
+        s.status = "closed"
+        s.end_time = start_time
+        s.current_qr = None
+    
+    if active_sessions:
+        await db.commit()
 
     new_session = AttendanceSession(
         faculty_id=faculty.id,
@@ -58,6 +114,9 @@ async def start_session(data: SessionCreate, faculty: Faculty = Depends(get_curr
         semester=data.semester,
         start_time=start_time,
         end_time=end_time,
+        title=data.title,
+        speaker=data.speaker,
+        time_slot=data.time_slot,
         status="active"
     )
     db.add(new_session)
@@ -84,7 +143,6 @@ async def close_session(id: int, faculty: Faculty = Depends(get_current_faculty)
         raise HTTPException(status_code=404, detail="Session not found")
         
     session.status = "closed"
-    session.end_time = datetime.now(timezone.utc)
     session.current_qr = None  # Invalidate QR immediately on close
     
     await db.commit()
@@ -143,4 +201,37 @@ async def get_session_info(id: int, faculty: Faculty = Depends(get_current_facul
         "start_time": (session.start_time.isoformat() + "Z") if session.start_time and not session.start_time.tzinfo else (session.start_time.isoformat() if session.start_time else None),
         "end_time": (session.end_time.isoformat() + "Z") if session.end_time and not session.end_time.tzinfo else (session.end_time.isoformat() if session.end_time else None),
         "current_qr": session.current_qr,
+        "title": session.title,
+        "speaker": session.speaker,
     }
+
+@router.delete("/{id}")
+async def delete_session(id: int, faculty: Faculty = Depends(get_current_faculty), db: AsyncSession = Depends(get_db)):
+    stmt = select(AttendanceSession).where(AttendanceSession.id == id, AttendanceSession.faculty_id == faculty.id)
+    res = await db.execute(stmt)
+    session = res.scalars().first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    # Delete related attendance records manually to avoid foreign key constraint errors if cascade isn't set up
+    from app.models.attendance import AttendanceRecord
+    from app.models.student_session_detail import StudentSessionDetail
+    
+    attendance_stmt = select(AttendanceRecord).where(AttendanceRecord.session_id == id)
+    attendance_res = await db.execute(attendance_stmt)
+    records = attendance_res.scalars().all()
+    
+    for r in records:
+        # Delete details
+        detail_stmt = select(StudentSessionDetail).where(StudentSessionDetail.attendance_id == r.id)
+        detail_res = await db.execute(detail_stmt)
+        detail = detail_res.scalars().first()
+        if detail:
+            await db.delete(detail)
+        await db.delete(r)
+        
+    await db.delete(session)
+    await db.commit()
+    
+    return {"message": "Session and its attendance records deleted successfully"}

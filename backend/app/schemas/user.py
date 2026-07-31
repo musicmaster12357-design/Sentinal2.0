@@ -40,6 +40,30 @@ class StudentImportItem(BaseModel):
     year: str
     section: str
 
+class StudentImportResult(BaseModel):
+    success_count: int
+    failed_count: int
+    errors: list[str]
+
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    department: Optional[str] = None
+    course: Optional[str] = None
+    specialisation: Optional[str] = None
+    semester: Optional[str] = None
+    phone: Optional[str] = None
+
+class PasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
+
 class ActivateRequest(BaseModel):
-    token: str
+    uuid: str
     password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str

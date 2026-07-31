@@ -7,9 +7,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
+from app.config import settings
+
 # CORS configuration
 origins = [
-    "*",
+    settings.FRONTEND_URL,
 ]
 
 app.add_middleware(
@@ -20,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import auth, attendance, session, analytics, matrix
+from app.api import auth, attendance, session, analytics, matrix, students
 from app.websocket import attendance_socket
 
 app.include_router(auth.router)
@@ -28,6 +30,7 @@ app.include_router(attendance.router)
 app.include_router(session.router)
 app.include_router(analytics.router)
 app.include_router(matrix.router)
+app.include_router(students.router)
 app.include_router(attendance_socket.router)
 
 @app.get("/")

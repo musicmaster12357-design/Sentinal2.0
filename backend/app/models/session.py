@@ -10,6 +10,9 @@ class AttendanceSession(Base):
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=True)
     semester = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    speaker = Column(String, nullable=True)
+    time_slot = Column(String, nullable=True)
     
     # QR Engine properties
     secret_key = Column(String, nullable=True) # Used to sign the QRs for this session

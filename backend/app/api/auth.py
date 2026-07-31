@@ -8,6 +8,7 @@ from app.models.student import Student
 from passlib.context import CryptContext
 from app.security.jwt_handler import create_access_token
 from fastapi.security import OAuth2PasswordBearer
+from app.dependencies import get_current_student, TokenData
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -47,39 +48,57 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+
 from app.schemas.user import StudentRegister
 
 @router.post("/register/student")
 async def register_student(data: StudentRegister, db: AsyncSession = Depends(get_db)):
-    stmt = select(Student).where(Student.email == data.email)
+    # Check if email is already taken by an active student
+    stmt = select(Student).where(Student.email == data.email, Student.status == "active")
     res = await db.execute(stmt)
     if res.scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
         
     stmt = select(Student).where(Student.campus_id == data.campus_id)
     res = await db.execute(stmt)
-    if res.scalars().first():
-        raise HTTPException(status_code=400, detail="Campus ID already registered")
-        
-    new_student = Student(
-        name=data.name,
-        email=data.email,
-        campus_id=data.campus_id,
-        password_hash=get_password_hash(data.password),
-        department=data.department,
-        course=data.course,
-        specialisation=data.specialisation,
-        semester=data.semester,
-        phone=data.phone,
-        status="active"
-    )
+    existing_student = res.scalars().first()
     
-    db.add(new_student)
+    if existing_student:
+        if existing_student.status == "active":
+            raise HTTPException(status_code=400, detail="Campus ID already registered")
+        else:
+            # Update the pending student
+            # Do NOT update existing_student.name so the faculty's seeded name is preserved
+            existing_student.email = data.email
+            existing_student.password_hash = get_password_hash(data.password)
+            existing_student.department = data.department
+            existing_student.course = data.course
+            existing_student.specialisation = data.specialisation
+            existing_student.semester = data.semester
+            existing_student.phone = data.phone
+            existing_student.status = "active"
+            student_to_use = existing_student
+    else:
+        new_student = Student(
+            name=data.name,
+            email=data.email,
+            campus_id=data.campus_id,
+            password_hash=get_password_hash(data.password),
+            department=data.department,
+            course=data.course,
+            specialisation=data.specialisation,
+            semester=data.semester,
+            phone=data.phone,
+            status="active"
+        )
+        db.add(new_student)
+        student_to_use = new_student
+        
     await db.commit()
-    await db.refresh(new_student)
+    await db.refresh(student_to_use)
     
     # Auto-login
-    access_token = create_access_token(data={"sub": new_student.email, "role": "student", "user_id": new_student.id})
+    access_token = create_access_token(data={"sub": student_to_use.email, "role": "student", "user_id": student_to_use.id})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/activate")
@@ -116,7 +135,7 @@ async def get_profile(token: str = Depends(oauth2_scheme), db: AsyncSession = De
         res = await db.execute(stmt)
         user = res.scalars().first()
         if user:
-            return {"id": user.id, "name": user.name, "email": user.email, "role": "faculty"}
+            return {"id": user.id, "name": user.name, "email": user.email, "role": "faculty", "department": user.department}
             
     if role == "student":
         stmt = select(Student).where(Student.email == email)
@@ -127,7 +146,124 @@ async def get_profile(token: str = Depends(oauth2_scheme), db: AsyncSession = De
                 "id": user.id, "name": user.name, "email": user.email, 
                 "role": "student", "department": user.department,
                 "course": user.course, "specialisation": user.specialisation, "semester": user.semester,
-                "campus_id": user.campus_id
+                "campus_id": user.campus_id, "phone": getattr(user, 'phone', None)
             }
             
     raise HTTPException(status_code=404, detail="User not found")
+@router.get("/lookup/student/{campus_id}")
+async def lookup_student(campus_id: str, db: AsyncSession = Depends(get_db)):
+    stmt = select(Student).where(Student.campus_id == campus_id)
+    res = await db.execute(stmt)
+    student = res.scalars().first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    return {
+        "name": student.name,
+        "department": student.department,
+        "course": student.course,
+        "specialisation": student.specialisation,
+        "status": student.status
+    }
+
+from app.schemas.user import ForgotPasswordRequest
+from pydantic import BaseModel
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@router.post("/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    # We only handle Student password resets this way
+    stmt = select(Student).where(Student.email == data.email)
+    res = await db.execute(stmt)
+    student = res.scalars().first()
+    
+    if not student:
+        # Don't reveal if user exists or not for security
+        return {"message": "If that email is registered, your password has been reset to your Campus ID."}
+        
+    # Instantly reset to Campus ID
+    student.password_hash = get_password_hash(student.campus_id)
+    await db.commit()
+    
+    return {"message": "If that email is registered, your password has been reset to your Campus ID."}
+
+@router.post("/change-password")
+async def change_password(data: ChangePasswordRequest, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    from app.security.jwt_handler import verify_token
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+        
+    email = payload.get("sub")
+    role = payload.get("role")
+    
+    user = None
+    if role == "faculty":
+        res = await db.execute(select(Faculty).where(Faculty.email == email))
+        user = res.scalars().first()
+    elif role == "student":
+        res = await db.execute(select(Student).where(Student.email == email))
+        user = res.scalars().first()
+        
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not verify_password(data.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+    user.password_hash = get_password_hash(data.new_password)
+    await db.commit()
+    
+    return {"message": "Password updated successfully"}
+
+from app.schemas.user import UserProfileUpdate
+
+@router.put("/profile/me")
+async def update_profile(data: UserProfileUpdate, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    from app.security.jwt_handler import verify_token
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+        
+    email = payload.get("sub")
+    role = payload.get("role")
+    
+    if role == "faculty":
+        res = await db.execute(select(Faculty).where(Faculty.email == email))
+        user = res.scalars().first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        if data.name: user.name = data.name
+        if data.department: user.department = data.department
+        # Faculty don't have course, specialisation, semester, phone in schema
+        
+    elif role == "student":
+        res = await db.execute(select(Student).where(Student.email == email))
+        user = res.scalars().first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        if data.name: user.name = data.name
+        if data.department: user.department = data.department
+        if data.course: user.course = data.course
+        if data.specialisation: user.specialisation = data.specialisation
+        if data.semester: user.semester = data.semester
+        if data.phone: user.phone = data.phone
+        
+    await db.commit()
+    
+    # Return updated profile using the existing logic (to keep it DRY, we just re-fetch basically, or manually build dict)
+    if role == "faculty":
+        return {"id": user.id, "name": user.name, "email": user.email, "role": "faculty"}
+    elif role == "student":
+         return {
+             "id": user.id, "name": user.name, "email": user.email, 
+             "role": "student", "department": user.department,
+             "course": user.course, "specialisation": user.specialisation, "semester": user.semester,
+             "campus_id": user.campus_id, "phone": getattr(user, 'phone', None)
+         }
+

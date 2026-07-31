@@ -1,133 +1,209 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Users, BookOpen, LogOut, Play, BarChart } from 'lucide-react';
+import { Plus, Users, BookOpen, Play, BarChart, Calendar, Clock, Book, ShieldCheck } from 'lucide-react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 
-import FacultyLayout from './FacultyLayout';
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { toast } from '../../store/toastStore';
 
 export default function FacultyDashboard() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
   
-  const [sessionForm, setSessionForm] = useState({
-    subject_id: '',
-    semester: 'I',
-    rotation_interval: 600,
-    lecture_hall: ''
-  });
-  const [duration, setDuration] = useState('30');
+  const [startTime, setStartTime] = useState('09:30');
+  const [endTime, setEndTime] = useState('11:00');
   const [subject, setSubject] = useState('');
+  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
   const [semester, setSemester] = useState('I');
 
   useEffect(() => {
-    // Fetch stats
-    api.get('/analytics/dashboard').then(res => setStats(res.data)).catch(console.error);
+    api.get('/analytics/dashboard')
+      .then(res => {
+        setStats(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error("Failed to load dashboard data");
+        setLoading(false);
+      });
   }, []);
 
   const handleStartSession = async (e) => {
     e.preventDefault();
+    if (!subject) {
+      toast.warning("Please enter a subject");
+      return;
+    }
     try {
       const res = await api.post('/session/start', {
-        subject, semester, duration: parseInt(duration)
+        subject, semester, time_slot: `${startTime}-${endTime}`, session_date: sessionDate
       });
+      toast.success("Session Started Successfully");
       navigate(`/faculty/session/${res.data.id}`);
     } catch (err) {
-      alert("Failed to start session");
+      toast.error("Failed to start session");
     }
   };
 
   return (
-    <FacultyLayout title="Dashboard">
-      <div className="space-y-8 relative z-10">
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-panel p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
-              <BookOpen size={24} />
-            </div>
-            <div>
-              <p className="text-slate-400 text-sm">Total Sessions</p>
-              <h3 className="text-2xl font-bold">{stats?.total_sessions || 0}</h3>
-            </div>
-          </motion.div>
-          
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-panel p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
-              <Users size={24} />
-            </div>
-            <div>
-              <p className="text-slate-400 text-sm">Total Attendance</p>
-              <h3 className="text-2xl font-bold">{stats?.total_attendance || 0}</h3>
-            </div>
-          </motion.div>
-          
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass-panel p-6 flex items-center gap-4 border-emerald-500/20">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 relative">
-              <span className="absolute top-0 right-0 w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>
-              <BarChart size={24} />
-            </div>
-            <div>
-              <p className="text-slate-400 text-sm">System Status</p>
-              <h3 className="text-xl font-bold text-emerald-400">Online</h3>
-            </div>
-          </motion.div>
+    <DashboardLayout title="Faculty Overview" role="faculty">
+      <div className="space-y-8">
+        {/* Welcome Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Good Morning, {user?.name?.split(' ')[0] || 'Dr.'}</h1>
+            <p className="text-text-secondary mt-1">Here is what's happening today.</p>
+          </div>
+          <div className="flex gap-4 text-sm text-text-muted font-medium bg-surface/50 border border-white/5 rounded-xl px-4 py-2">
+            <span className="flex items-center gap-2"><Calendar size={16} className="text-primary-light" /> {new Date().toLocaleDateString(undefined, { weekday: 'long' })}</span>
+            <span className="flex items-center gap-2 border-l border-white/10 pl-4"><Clock size={16} className="text-secondary" /> {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+          </div>
         </div>
 
-        {stats?.active_session ? (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel p-8 bg-blue-900/10 border-blue-500/30">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-              <div>
-                <div className="badge badge-active mb-3 inline-block">Live Session</div>
-                <h2 className="text-2xl font-bold text-white">Session in Progress</h2>
-                <p className="text-blue-200 mt-1">You have an active lecture running right now.</p>
-              </div>
-              <button 
-                onClick={() => navigate(`/faculty/session/${stats.active_session}`)}
-                className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
-              >
-                <Play size={18} fill="currentColor" /> Resume Session
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-panel p-8 max-w-2xl">
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {loading ? (
+            Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)
+          ) : (
+            <>
+              <Card hover className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary-light">
+                  <BookOpen size={24} />
+                </div>
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Total Sessions</p>
+                  <h3 className="text-2xl font-bold mt-1">{stats?.total_sessions || 0}</h3>
+                </div>
+              </Card>
+              
+              <Card hover className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center text-secondary">
+                  <Users size={24} />
+                </div>
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Total Attendance</p>
+                  <h3 className="text-2xl font-bold mt-1">{stats?.total_attendance || 0}</h3>
+                </div>
+              </Card>
+
+              <Card hover className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
+                  <BarChart size={24} />
+                </div>
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Feedback Rating</p>
+                  <h3 className="text-2xl font-bold mt-1">4.8 <span className="text-sm text-text-muted font-normal">avg</span></h3>
+                </div>
+              </Card>
+              
+              <Card hover className="flex items-center gap-4 border-status-success/20">
+                <div className="w-12 h-12 rounded-xl bg-status-success/20 flex items-center justify-center text-status-success relative">
+                  <span className="absolute top-0 right-0 w-3 h-3 bg-status-success rounded-full animate-ping"></span>
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <p className="text-text-muted text-sm font-medium">System Status</p>
+                  <h3 className="text-xl font-bold text-status-success mt-1">Online</h3>
+                </div>
+              </Card>
+            </>
+          )}
+        </div>
+
+        {/* Action Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Create Session Card */}
+          <Card className="flex flex-col">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Plus size={24} className="text-purple-400" /> Start New Session
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Plus size={22} className="text-primary-light" /> Start New Session
               </h2>
-              <p className="text-slate-400 text-sm mt-1">Initialize a dynamic QR attendance session.</p>
+              <p className="text-text-muted text-sm mt-1">Initialize a dynamic QR attendance session.</p>
             </div>
             
-            <form onSubmit={handleStartSession} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Subject / Topic</label>
-                  <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className="input-field" placeholder="e.g. Advanced Cryptography" required />
+            <form onSubmit={handleStartSession} className="space-y-5 flex-1 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Subject / Topic</label>
+                  <Input 
+                    icon={Book}
+                    type="text" 
+                    value={subject} 
+                    onChange={e => setSubject(e.target.value)} 
+                    placeholder="e.g. Advanced Cryptography" 
+                    required 
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Session Date</label>
+                    <Input 
+                      icon={Calendar}
+                      type="date" 
+                      value={sessionDate} 
+                      onChange={e => setSessionDate(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Start Time</label>
+                      <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">End Time</label>
+                      <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} required />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Semester</label>
-                  <select value={semester} onChange={e => setSemester(e.target.value)} className="input-field" required>
-                    <option value="" disabled>Select</option>
-                    {['I'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Duration (Min)</label>
-                  <input type="number" value={duration} onChange={e => setDuration(e.target.value)} className="input-field" placeholder="30" required min="1" />
-                </div>
-              </div>
-              <button type="submit" className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
+              <Button type="submit" variant="primary" className="w-full mt-6 py-3">
                 Generate Live QR Session <Play size={18} />
-              </button>
+              </Button>
             </form>
-          </motion.div>
-        )}
+          </Card>
+
+          {/* Active Session OR Placeholder Chart */}
+          {stats?.active_session ? (
+            <Card className="bg-primary/5 border-primary/30 relative overflow-hidden flex flex-col justify-center items-center text-center">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[100px] pointer-events-none animate-pulse-ring"></div>
+              
+              <Badge variant="primary" className="mb-6 animate-pulse">Live Session Active</Badge>
+              <h2 className="text-3xl font-bold text-white mb-2">Session in Progress</h2>
+              <p className="text-text-secondary mb-8 max-w-sm">You have an active lecture currently running. Students are scanning their QR codes.</p>
+              
+              <Button 
+                onClick={() => navigate(`/faculty/session/${stats.active_session}`)}
+                variant="primary"
+                className="w-full sm:w-auto px-8 py-3"
+              >
+                <Play size={18} fill="currentColor" /> Resume Session View
+              </Button>
+            </Card>
+          ) : (
+            <Card className="flex flex-col justify-center items-center border-dashed border-white/10 bg-surface/30">
+               {/* Placeholder for future Area Chart / Heatmap */}
+               <div className="w-full h-full flex flex-col items-center justify-center opacity-50">
+                 <BarChart size={48} className="text-text-muted mb-4" />
+                 <p className="text-text-secondary font-medium">Attendance Analytics</p>
+                 <p className="text-text-muted text-sm text-center max-w-xs mt-2">Detailed weekly charts and heatmaps will appear here once more data is collected.</p>
+               </div>
+            </Card>
+          )}
+
+        </div>
       </div>
-    </FacultyLayout>
+    </DashboardLayout>
   );
 }

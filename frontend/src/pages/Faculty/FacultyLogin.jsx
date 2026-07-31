@@ -12,7 +12,13 @@ export default function FacultyLogin() {
   const [error, setError] = useState('');
   
   const navigate = useNavigate();
-  const setToken = useAuthStore(state => state.setToken);
+  const { token, user, setToken, setUser } = useAuthStore();
+
+  React.useEffect(() => {
+    if (token) {
+      navigate('/faculty/dashboard');
+    }
+  }, [token, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,6 +28,10 @@ export default function FacultyLogin() {
       const res = await api.post('/auth/login', { email, password });
       setToken(res.data.access_token);
       localStorage.setItem('token', res.data.access_token);
+      
+      const profileRes = await api.get('/auth/profile/me');
+      setUser(profileRes.data);
+      
       navigate('/faculty/dashboard');
     } catch (err) {
       setError(err.response?.data?.detail || "Invalid email or password");
@@ -89,6 +99,11 @@ export default function FacultyLogin() {
                   required
                 />
               </div>
+              <div className="flex justify-end mt-2">
+                <Link to="/forgot-password" className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                  Forgot Password?
+                </Link>
+              </div>
             </div>
 
             <div className="flex items-center justify-between mt-2">
@@ -96,7 +111,6 @@ export default function FacultyLogin() {
                 <input type="checkbox" className="mr-2 rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-purple-500" />
                 Remember me
               </label>
-              <a href="#" className="text-sm text-purple-400 hover:text-purple-300 transition-colors">Forgot password?</a>
             </div>
 
             <button 

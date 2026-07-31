@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     QR_SECRET: str = "my_super_secret_qr_key_change_in_production"
+    FRONTEND_URL: str = "http://localhost:5173"
     
     class Config:
         env_file = ".env"

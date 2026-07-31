@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ScanLine, CheckCircle2, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
 
 export default function QRScanner() {
   const [scanResult, setScanResult] = useState(null); // null | 'processing' | 'success' | 'error'
@@ -112,8 +113,8 @@ export default function QRScanner() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
+    <DashboardLayout role="student" title="Scan QR Code">
+      <div className="flex flex-col items-center justify-center relative overflow-hidden h-full">
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-md mx-4">
         <div className="glass-panel p-6 sm:p-8">
@@ -172,6 +173,7 @@ export default function QRScanner() {
           )}
         </div>
       </motion.div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

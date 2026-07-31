@@ -1,0 +1,7 @@
+/* Tailwind handles colors via config, but we can define custom CSS variables here if needed for specific overrides */
+:root {
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #06B6D4;
+}

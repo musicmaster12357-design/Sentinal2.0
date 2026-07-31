@@ -1,0 +1,12 @@
+/* Typography overrides */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight text-text-primary;
+  }
+  
+  h1 { @apply text-4xl md:text-5xl; font-weight: 700; }
+  h2 { @apply text-3xl md:text-4xl; font-weight: 700; }
+  h3 { @apply text-2xl md:text-3xl; font-weight: 600; }
+  p { @apply text-text-secondary leading-relaxed; font-weight: 400; }
+  small { @apply text-text-muted text-sm; font-weight: 500; }
+}

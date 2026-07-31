@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { UserPlus, User, Lock, Loader2, Building, BookOpen, Layers, Phone } from 'lucide-react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 
 export default function StudentRegister() {
   const [formData, setFormData] = useState({
@@ -24,8 +25,29 @@ export default function StudentRegister() {
   const navigate = useNavigate();
   const { setToken, setUser } = useAuthStore();
 
+  const handleLookup = async () => {
+    if (formData.campus_id.length < 3) {
+      return;
+    }
+    try {
+      const res = await api.get(`/auth/lookup/student/${formData.campus_id}`);
+      const student = res.data;
+      if (student) {
+        setFormData(prev => ({
+          ...prev,
+          name: student.name,
+          course: student.course || prev.course,
+          department: student.department || prev.department
+        }));
+      }
+    } catch (err) {
+      console.error("Could not load student data", err);
+    }
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleRegister = async (e) => {
@@ -40,17 +62,24 @@ export default function StudentRegister() {
 
     try {
       const { confirm_password, ...apiData } = formData;
+      // Sanitize campus_id (remove hyphens and spaces)
+      apiData.campus_id = apiData.campus_id.replace(/[^a-zA-Z0-9]/g, '');
+
       const res = await api.post('/auth/register/student', apiData);
-      setToken(res.data.access_token);
       
-      const profileRes = await api.get('/auth/profile/me');
-      setUser(profileRes.data);
-      
-      const redirectUrl = sessionStorage.getItem('redirectAfterLogin') || '/student/dashboard';
-      sessionStorage.removeItem('redirectAfterLogin');
-      navigate(redirectUrl);
+      // Instead of logging them in directly, redirect to login page
+      toast.success("Registration successful! Please login.");
+      navigate('/student/login');
     } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed");
+      let errorMsg = "Registration failed";
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string') {
+          errorMsg = err.response.data.detail;
+        } else if (Array.isArray(err.response.data.detail)) {
+          errorMsg = err.response.data.detail[0]?.msg || "Validation error in inputs";
+        }
+      }
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -58,8 +87,8 @@ export default function StudentRegister() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-y-auto py-12 custom-scrollbar">
-      <div className="absolute inset-0 bg-[#0f172a]" />
-      <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+      <div className="absolute inset-0 bg-background" />
+      <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-primary-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none animate-pulse" style={{ animationDelay: '1.5s' }} />
 
       <motion.div 
@@ -102,25 +131,29 @@ export default function StudentRegister() {
                     <BookOpen size={18} className="text-slate-500" />
                   </div>
                   <input 
-                    type="text" name="campus_id" value={formData.campus_id} onChange={handleChange}
+                    type="text" name="campus_id" value={formData.campus_id} onChange={handleChange} onBlur={handleLookup}
                     className="input-field pl-10 bg-slate-900/50 border-slate-700/50 focus:border-blue-500/50" 
                     placeholder="e.g. 51234" required
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Full Name</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User size={18} className="text-slate-500" />
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Full Name</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-400 transition-colors">
+                      <User size={18} />
+                    </div>
+                    <input 
+                      type="text" 
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="input-field pl-10"
+                      placeholder="John Doe" 
+                      required 
+                    />
                   </div>
-                  <input 
-                    type="text" name="name" value={formData.name} onChange={handleChange}
-                    className="input-field pl-10 bg-slate-900/50 border-slate-700/50 focus:border-blue-500/50" 
-                    placeholder="John Doe" required
-                  />
                 </div>
-              </div>
             </div>
 
             {/* ROW 2 */}
@@ -196,6 +229,10 @@ export default function StudentRegister() {
                     className="input-field pl-10 bg-slate-900/50 border-slate-700/50 focus:border-blue-500/50" required
                   >
                     <option value="Computer Science">Computer Science</option>
+                    <option value="Business Administration">Business Administration</option>
+                    <option value="Commerce">Commerce</option>
+                    <option value="Science">Science</option>
+                    <option value="Arts">Arts</option>
                   </select>
                 </div>
               </div>
@@ -211,6 +248,10 @@ export default function StudentRegister() {
                   >
                     <option value="BCA">BCA</option>
                     <option value="BSc">BSc</option>
+                    <option value="BBA">BBA</option>
+                    <option value="BCom">BCom</option>
+                    <option value="BA">BA</option>
+                    <option value="BTech">BTech</option>
                   </select>
                 </div>
               </div>
@@ -224,27 +265,28 @@ export default function StudentRegister() {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <BookOpen size={18} className="text-slate-500" />
                   </div>
-                  <select 
-                    name="specialisation" value={formData.specialisation} onChange={handleChange}
-                    className="input-field pl-10 bg-slate-900/50 border-slate-700/50 focus:border-blue-500/50" required
-                  >
-                    <option value="" disabled>Select Specialisation</option>
-                    <option value="BCA Data Science, Artificial Intelligence and Machine Learning - Microsoft">BCA Data Science, Artificial Intelligence and Machine Learning - Microsoft</option>
-                    <option value="BCA Artificial Intelligence, Machine Learning and Cloud Computing - Microsoft">BCA Artificial Intelligence, Machine Learning and Cloud Computing - Microsoft</option>
-                    <option value="BCA Artificial Intelligence and Machine Learning with minor in Robotics - Microsoft">BCA Artificial Intelligence and Machine Learning with minor in Robotics - Microsoft</option>
-                    <option value="BCA Cybersecurity and Ethical Hacking with minor in Digital Forensics - IBM">BCA Cybersecurity and Ethical Hacking with minor in Digital Forensics - IBM</option>
-                    <option value="BCA Artificial Intelligence and Cloud Computing with minor in DevOps - IBM">BCA Artificial Intelligence and Cloud Computing with minor in DevOps - IBM</option>
-                    <option value="BCA Data Science and Artificial Intelligence with minor in Big Data Analytics - Microsoft">BCA Data Science and Artificial Intelligence with minor in Big Data Analytics - Microsoft</option>
-                    <option value="BCA Cloud Computing and Cybersecurity with minor in Ethical Hacking - IBM">BCA Cloud Computing and Cybersecurity with minor in Ethical Hacking - IBM</option>
-                    <option value="BCA Cybersecurity, Ethical Hacking and Data Analytics - Microsoft">BCA Cybersecurity, Ethical Hacking and Data Analytics - Microsoft</option>
-                    <option value="BCA Cloud Computing Cyber Security & digital Forensic -Microsoft">BCA Cloud Computing Cyber Security & digital Forensic -Microsoft</option>
-                    <option value="BCA Artifical Inteligence, DevOps and Full Stack Development - Microsoft">BCA Artifical Inteligence, DevOps and Full Stack Development - Microsoft</option>
-                    <option value="BCA Artificial Intelligence, Robotics and Internet of Things - Microsoft">BCA Artificial Intelligence, Robotics and Internet of Things - Microsoft</option>
-                    <option value="BCA Data Science, Big Data Analytics and Full Stack Development - Microsoft">BCA Data Science, Big Data Analytics and Full Stack Development - Microsoft</option>
-                  </select>
+                  <input 
+                    type="text" 
+                    name="specialisation" 
+                    list="specialisationList"
+                    value={formData.specialisation || ''} 
+                    onChange={handleChange}
+                    className="input-field pl-10 bg-slate-900/50 border-slate-700/50 focus:border-blue-500/50" 
+                    placeholder="Type or select..." 
+                    required 
+                  />
+                  <datalist id="specialisationList">
+                    <option value="Data Science" />
+                    <option value="Artificial Intelligence" />
+                    <option value="Cyber Security" />
+                    <option value="Cloud Computing" />
+                    <option value="Finance" />
+                    <option value="Marketing" />
+                    <option value="Human Resources" />
+                    <option value="General" />
+                  </datalist>
                 </div>
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Semester</label>
                 <div className="relative">
@@ -256,7 +298,7 @@ export default function StudentRegister() {
                     className="input-field pl-10 bg-slate-900/50 border-slate-700/50 focus:border-blue-500/50" required
                   >
                     <option value="" disabled>Select Sem</option>
-                    {['I'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
