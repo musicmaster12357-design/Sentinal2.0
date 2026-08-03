@@ -41,7 +41,7 @@ export default function LiveSession() {
 
   // Build the QR string from the static token
   const qrString = qrToken
-    ? `${window.location.origin}/student/verify-attendance/${qrToken}`
+    ? `${window.location.origin}/attendance/student/verify-attendance/${qrToken}`
     : null;
 
   // Dynamically load QRCodeSVG to keep initial render fast
@@ -121,7 +121,7 @@ export default function LiveSession() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row relative overflow-hidden bg-[#0f172a]">
+    <div className="min-h-screen flex flex-col md:flex-row relative overflow-hidden bg-[#0f172a]" data-qr-url={qrString || ''}>
       {/* Background blobs */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />

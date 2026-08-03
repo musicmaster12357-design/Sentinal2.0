@@ -5,13 +5,11 @@ class AttendanceSession(Base):
     __tablename__ = "attendance_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    faculty_id = Column(Integer, ForeignKey("faculty.id"), nullable=False)
-    subject_id = Column(String, nullable=False)
+    faculty_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True) # made integer
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=True)
-    semester = Column(String, nullable=True)
     title = Column(String, nullable=True)
-    speaker = Column(String, nullable=True)
     time_slot = Column(String, nullable=True)
     
     # QR Engine properties

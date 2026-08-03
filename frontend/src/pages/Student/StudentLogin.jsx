@@ -15,9 +15,15 @@ export default function StudentLogin() {
 
   React.useEffect(() => {
     if (token) {
-      navigate('/student/dashboard');
+      if (user) {
+        if (user.role.toLowerCase() === 'student') {
+          navigate('/student/dashboard');
+        } else {
+          navigate('/faculty/dashboard');
+        }
+      }
     }
-  }, [token, navigate]);
+  }, [token, user, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -28,7 +34,7 @@ export default function StudentLogin() {
       const res = await api.post('/auth/login', { email, password });
       setToken(res.data.access_token);
       
-      const profileRes = await api.get('/auth/profile/me');
+      const profileRes = await api.get('/users/me');
       setUser(profileRes.data);
       
       const redirectUrl = sessionStorage.getItem('redirectAfterLogin') || '/student/dashboard';

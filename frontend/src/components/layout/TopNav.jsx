@@ -15,7 +15,7 @@ export const TopNav = ({ title, onMenuClick }) => {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      if (user?.role === 'faculty') {
+      if (user?.role && (user.role.toLowerCase() === 'faculty' || user.role === 'Super Admin')) {
         navigate('/faculty/students');
       }
       toast.info(`Searching for "${searchQuery}"...`);
@@ -96,7 +96,7 @@ export const TopNav = ({ title, onMenuClick }) => {
           </AnimatePresence>
         </div>
 
-        <Link to={`/${user?.role}/profile`} className="flex items-center gap-3 pl-6 border-l border-white/10 hover:opacity-80 transition-opacity">
+        <Link to={`/${user?.role && (user.role.toLowerCase() === 'faculty' || user.role === 'Super Admin') ? 'faculty' : 'student'}/profile`} className="flex items-center gap-3 pl-6 border-l border-white/10 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary-light font-medium">
             {userName.charAt(0)}
           </div>

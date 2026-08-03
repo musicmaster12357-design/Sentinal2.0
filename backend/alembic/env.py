@@ -23,7 +23,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import Base
-from app.config import settings
+from app.core.config import settings
 import app.models
 
 target_metadata = Base.metadata

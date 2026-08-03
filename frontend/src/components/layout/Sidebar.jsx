@@ -33,7 +33,9 @@ export const Sidebar = ({ role = 'faculty', isOpen, setIsOpen }) => {
     { name: 'Profile', path: '/student/profile', icon: Settings },
   ];
 
-  const links = role === 'faculty' ? facultyLinks : studentLinks;
+  const normalizedRole = role ? role.toLowerCase() : 'student';
+  const isFaculty = normalizedRole === 'faculty' || normalizedRole === 'super admin';
+  const links = isFaculty ? facultyLinks : studentLinks;
 
   return (
     <>

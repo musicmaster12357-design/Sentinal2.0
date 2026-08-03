@@ -7,8 +7,8 @@ class AttendanceRecord(Base):
     __tablename__ = "attendance"
 
     id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
-    session_id = Column(Integer, ForeignKey("attendance_sessions.id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id = Column(Integer, ForeignKey("attendance_sessions.id", ondelete="CASCADE"), nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     
     # Workflow states: scanned -> form_submitted -> confirmed
@@ -16,7 +16,7 @@ class AttendanceRecord(Base):
     status = Column(String, default="pending") # pending, present, absent
 
     # Relationships
-    student = relationship("Student")
+    student = relationship("User")
     session = relationship("AttendanceSession")
 
     __table_args__ = (

@@ -17,7 +17,7 @@ export default function StudentManagement() {
   
   // Add modal state
   const [addingStudent, setAddingStudent] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', campus_id: '', specialisation: '', password: '' });
+  const [addForm, setAddForm] = useState({ name: '', campus_id: '', email: '', specialisation: '', password: '' });
 
   useEffect(() => {
     fetchStudents();
@@ -123,7 +123,7 @@ export default function StudentManagement() {
       const res = await api.post('/students', addForm);
       setStudents([...students, res.data.student]);
       setAddingStudent(false);
-      setAddForm({ name: '', campus_id: '', specialisation: '', password: '' });
+      setAddForm({ name: '', campus_id: '', email: '', specialisation: '', password: '' });
       setMessage('Student added successfully');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
@@ -360,6 +360,16 @@ export default function StudentManagement() {
                     type="text" 
                     value={addForm.campus_id}
                     onChange={e => setAddForm({...addForm, campus_id: e.target.value})}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Email Address</label>
+                  <input 
+                    type="email" 
+                    value={addForm.email}
+                    onChange={e => setAddForm({...addForm, email: e.target.value})}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />

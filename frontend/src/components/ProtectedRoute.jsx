@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
 import { Loader2 } from 'lucide-react';
@@ -7,12 +7,13 @@ import { Loader2 } from 'lucide-react';
 export default function ProtectedRoute({ children, role }) {
   const { token, user, setUser } = useAuthStore();
   const [isVerifying, setIsVerifying] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     const verifyUser = async () => {
       if (token && !user) {
         try {
-          const res = await api.get('/auth/profile/me');
+          const res = await api.get('/users/me');
           setUser(res.data);
         } catch (err) {
           console.error("Failed to verify token", err);
@@ -26,7 +27,8 @@ export default function ProtectedRoute({ children, role }) {
   }, [token, user, setUser]);
 
   if (!token) {
-    return <Navigate to={role === 'faculty' ? "/faculty/login" : "/student/login"} replace />;
+    sessionStorage.setItem('redirectAfterLogin', location.pathname);
+    return <Navigate to="/" replace />;
   }
 
   if (isVerifying) {
@@ -37,7 +39,7 @@ export default function ProtectedRoute({ children, role }) {
     );
   }
 
-  if (role && user?.role !== role) {
+  if (role && user?.role && user.role.toLowerCase() !== role.toLowerCase() && !(role === 'faculty' && user.role === 'Super Admin')) {
     return <Navigate to="/" replace />;
   }
 

@@ -1,14 +1,15 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
 
 class TokenData(BaseModel):
-    email: Optional[str] = None
+    sub: Optional[str] = None
     role: Optional[str] = None
-    user_id: Optional[int] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -18,52 +19,45 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
-    department: str
-
-class StudentRegister(BaseModel):
-    campus_id: str = Field(..., min_length=3, max_length=20, pattern=r'^[a-zA-Z0-9]+$')
-    name: str
-    email: EmailStr
-    password: str
-    department: str
-    course: str
-    specialisation: str
-    semester: str
-    phone: str
-
-class StudentImportItem(BaseModel):
     campus_id: str
+    role_name: str
+    phone: Optional[str] = None
+
+class ProfileResponse(BaseModel):
     name: str
-    email: EmailStr
-    department: str
-    course: str
-    year: str
-    section: str
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
+    department_id: Optional[int] = None
 
-class StudentImportResult(BaseModel):
-    success_count: int
-    failed_count: int
-    errors: list[str]
-
-class UserProfileUpdate(BaseModel):
+class UserResponse(BaseModel):
+    id: int
+    uuid: str
+    campus_id: str
+    email: str
+    status: str
+    role: str
     name: Optional[str] = None
+    phone: Optional[str] = None
     department: Optional[str] = None
     course: Optional[str] = None
     specialisation: Optional[str] = None
     semester: Optional[str] = None
-    phone: Optional[str] = None
+    profile: Optional[ProfileResponse] = None
 
-class PasswordUpdate(BaseModel):
+    class Config:
+        from_attributes = True
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+class ChangePasswordRequest(BaseModel):
     old_password: str
-    new_password: str
+    new_password: str = Field(..., min_length=8)
 
-class ActivateRequest(BaseModel):
-    uuid: str
-    password: str
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    department: Optional[str] = None
+    course: Optional[str] = None
+    specialisation: Optional[str] = None
+    semester: Optional[str] = None

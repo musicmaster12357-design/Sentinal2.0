@@ -16,3 +16,5 @@ python-dotenv
 openpyxl
 pytz
 ollama
+asyncpg
+psycopg2-binary

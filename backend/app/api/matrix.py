@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.dependencies import get_current_faculty
+from app.core.permissions import get_current_user
+from app.models.user import User
 from app.schemas.user import TokenData
 from datetime import date, datetime
 import openpyxl
@@ -14,20 +15,20 @@ import pytz
 
 IST = pytz.timezone('Asia/Kolkata')
 
-router = APIRouter(prefix="/api/attendance/faculty", tags=["attendance_matrix"])
+router = APIRouter(prefix="/api/attendance/User", tags=["attendance_matrix"])
 
 @router.get("/matrix")
 async def get_attendance_matrix(
     date: date = Query(...),
     group_by: str = Query("all"),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_faculty)
+    current_user: TokenData = Depends(get_current_user)
 ):
     from app.models.session import AttendanceSession
-    from app.models.student import Student
+    from app.models.user import User
     from app.models.attendance import AttendanceRecord
     
-    # 1. Fetch all sessions for this faculty on this date
+    # 1. Fetch all sessions for this User on this date
     stmt_sessions = select(AttendanceSession).where(
         AttendanceSession.faculty_id == current_user.user_id
     ).order_by(AttendanceSession.start_time)
@@ -40,7 +41,7 @@ async def get_attendance_matrix(
     if not day_sessions:
         return {"sessions": [], "students": [], "grouped_students": {}}
         
-    stmt_students = select(Student)
+    stmt_students = select(User)
     res_students = await db.execute(stmt_students)
     students = res_students.scalars().all()
     
@@ -165,7 +166,7 @@ async def export_excel(
     date: date = Query(...),
     group_by: str = Query("all"),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_faculty)
+    current_user: TokenData = Depends(get_current_user)
 ):
     matrix_data = await get_attendance_matrix(date=date, db=db, current_user=current_user, group_by=group_by)
     
@@ -251,14 +252,14 @@ async def export_excel(
                 ws.row_dimensions[4].height = 40
 
             # ── Rows 5+: Data ─────────────────────────────────────────────────
-            for i, student in enumerate(students, 1):
+            for i, User in enumerate(students, 1):
                 row_num = 4 + i
                 row_data = [
                     i,
-                    student["campus_id"],
-                    student["name"],
-                    student["email"],
-                    student["phone"] or "N/A"
+                    User["campus_id"],
+                    User["name"],
+                    User["email"],
+                    User["phone"] or "N/A"
                 ]
                 for col_idx, val in enumerate(row_data, 1):
                     c = ws.cell(row=row_num, column=col_idx, value=val)
@@ -268,7 +269,7 @@ async def export_excel(
 
                 for s_idx, s in enumerate(sessions, 1):
                     col = FIXED_COLS + s_idx
-                    present = student["attendance"].get(s["id"], False)
+                    present = User["attendance"].get(s["id"], False)
                     c = ws.cell(row=row_num, column=col, value="✅" if present else "❌")
                     c.alignment = Alignment(horizontal="center", vertical="center")
                     c.font = Font(size=12)
@@ -293,17 +294,17 @@ async def export_excel(
 async def export_feedback_excel(
     session_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_faculty)
+    current_user: TokenData = Depends(get_current_user)
 ):
     from app.models.session import AttendanceSession
-    from app.models.student import Student
+    from app.models.user import User
     from app.models.attendance import AttendanceRecord
     from app.models.student_session_detail import StudentSessionDetail
     from datetime import timezone, timedelta
     
     IST = timezone(timedelta(hours=5, minutes=30))
     
-    # Verify session belongs to faculty
+    # Verify session belongs to User
     session_res = await db.execute(select(AttendanceSession).where(
         AttendanceSession.id == session_id,
         AttendanceSession.faculty_id == current_user.user_id
@@ -315,8 +316,8 @@ async def export_feedback_excel(
         
     # Query all students who attended and their feedback
     stmt = (
-        select(Student, StudentSessionDetail)
-        .join(AttendanceRecord, Student.id == AttendanceRecord.student_id)
+        select(User, StudentSessionDetail)
+        .join(AttendanceRecord, User.id == AttendanceRecord.student_id)
         .join(StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id)
         .where(AttendanceRecord.session_id == session_id)
         .order_by(StudentSessionDetail.submitted_time)
@@ -327,11 +328,11 @@ async def export_feedback_excel(
     
     # Group by course+specialisation
     grouped_feedbacks = {}
-    for student, feedback in records:
-        key = f"{student.course or 'Unknown'}({student.specialisation or 'None'})"
+    for User, feedback in records:
+        key = f"{User.course or 'Unknown'}({User.specialisation or 'None'})"
         if key not in grouped_feedbacks:
             grouped_feedbacks[key] = []
-        grouped_feedbacks[key].append((student, feedback))
+        grouped_feedbacks[key].append((User, feedback))
         
     wb = openpyxl.Workbook()
     
@@ -352,7 +353,7 @@ async def export_feedback_excel(
                 
             # Headers
             headers = [
-                "S.No", "Campus ID", "Student Name", 
+                "S.No", "Campus ID", "User Name", 
                 "Interactive Rating", "Relevant Rating", 
                 "Learned Today", "Key Takeaway", 
                 "Overall Satisfaction", "Issue Note", "Submitted At"
@@ -375,7 +376,7 @@ async def export_feedback_excel(
                 
             ws.row_dimensions[1].height = 25
             
-            for i, (student, feedback) in enumerate(items, 1):
+            for i, (User, feedback) in enumerate(items, 1):
                 row_num = i + 1
                 sub_time = "N/A"
                 if feedback.submitted_time:
@@ -386,8 +387,8 @@ async def export_feedback_excel(
                     
                 row_data = [
                     i,
-                    student.campus_id,
-                    student.name,
+                    User.campus_id,
+                    User.name,
                     f"{feedback.interactive_rating}/5" if feedback.interactive_rating else "N/A",
                     f"{feedback.relevant_rating}/5" if feedback.relevant_rating else "N/A",
                     feedback.learned_today or "N/A",
@@ -424,10 +425,10 @@ async def export_feedback_excel(
 async def export_feedback_excel_by_date(
     date_str: str,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_faculty)
+    current_user: TokenData = Depends(get_current_user)
 ):
     from app.models.session import AttendanceSession
-    from app.models.student import Student
+    from app.models.user import User
     from app.models.attendance import AttendanceRecord
     from app.models.student_session_detail import StudentSessionDetail
     from datetime import datetime, timezone, timedelta
@@ -445,7 +446,7 @@ async def export_feedback_excel_by_date(
     start_utc = start_dt.astimezone(timezone.utc)
     end_utc = end_dt.astimezone(timezone.utc)
     
-    # Verify sessions belong to faculty on this date
+    # Verify sessions belong to User on this date
     session_res = await db.execute(select(AttendanceSession).where(
         AttendanceSession.faculty_id == current_user.user_id,
         AttendanceSession.start_time >= start_utc,
@@ -461,8 +462,8 @@ async def export_feedback_excel_by_date(
     
     # Query all students who attended and their feedback
     stmt = (
-        select(Student, StudentSessionDetail, AttendanceRecord.session_id)
-        .join(AttendanceRecord, Student.id == AttendanceRecord.student_id)
+        select(User, StudentSessionDetail, AttendanceRecord.session_id)
+        .join(AttendanceRecord, User.id == AttendanceRecord.student_id)
         .join(StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id)
         .where(AttendanceRecord.session_id.in_(session_ids))
         .order_by(StudentSessionDetail.submitted_time)
@@ -473,10 +474,10 @@ async def export_feedback_excel_by_date(
     
     # Group by session_id
     grouped_feedbacks = {}
-    for student, feedback, sess_id in records:
+    for User, feedback, sess_id in records:
         if sess_id not in grouped_feedbacks:
             grouped_feedbacks[sess_id] = []
-        grouped_feedbacks[sess_id].append((student, feedback))
+        grouped_feedbacks[sess_id].append((User, feedback))
         
     wb = openpyxl.Workbook()
     
@@ -499,7 +500,7 @@ async def export_feedback_excel_by_date(
                 
             # Headers
             headers = [
-                "S.No", "Campus ID", "Student Name", 
+                "S.No", "Campus ID", "User Name", 
                 "Interactive Rating", "Relevant Rating", 
                 "Learned Today", "Key Takeaway", 
                 "Overall Satisfaction", "Issue Note", "Submitted At"
@@ -522,7 +523,7 @@ async def export_feedback_excel_by_date(
                 
             ws.row_dimensions[1].height = 25
             
-            for i, (student, feedback) in enumerate(items, 1):
+            for i, (User, feedback) in enumerate(items, 1):
                 row_num = i + 1
                 sub_time = "N/A"
                 if feedback.submitted_time:
@@ -533,8 +534,8 @@ async def export_feedback_excel_by_date(
                     
                 row_data = [
                     i,
-                    student.campus_id,
-                    student.name,
+                    User.campus_id,
+                    User.name,
                     f"{feedback.interactive_rating}/5" if feedback.interactive_rating else "N/A",
                     f"{feedback.relevant_rating}/5" if feedback.relevant_rating else "N/A",
                     feedback.learned_today or "N/A",
@@ -568,13 +569,13 @@ async def export_feedback_excel_by_date(
 async def get_consolidated_attendance_matrix(
     group_by: str = "course",
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_faculty)
+    current_user: TokenData = Depends(get_current_user)
 ):
     from app.models.session import AttendanceSession
-    from app.models.student import Student
+    from app.models.user import User
     from app.models.attendance import AttendanceRecord
     
-    # 1. Fetch all sessions for this faculty
+    # 1. Fetch all sessions for this User
     stmt_sessions = select(AttendanceSession).where(
         AttendanceSession.faculty_id == current_user.user_id
     ).order_by(AttendanceSession.start_time)
@@ -585,7 +586,7 @@ async def get_consolidated_attendance_matrix(
     if not all_sessions:
         return {"dates": [], "grouped_students": {}}
         
-    stmt_students = select(Student)
+    stmt_students = select(User)
     res_students = await db.execute(stmt_students)
     students = res_students.scalars().all()
     
@@ -652,7 +653,7 @@ async def get_consolidated_attendance_matrix(
 async def export_consolidated_excel(
     group_by: str = Query("course"),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_faculty)
+    current_user: TokenData = Depends(get_current_user)
 ):
     matrix_data = await get_consolidated_attendance_matrix(group_by=group_by, db=db, current_user=current_user)
     
@@ -714,14 +715,14 @@ async def export_consolidated_excel(
             ws.row_dimensions[3].height = 30
 
             # ── Rows 4+: Data ─────────────────────────────────────────────────
-            for i, student in enumerate(students, 1):
+            for i, User in enumerate(students, 1):
                 row_num = 3 + i
                 row_data = [
                     i,
-                    student["campus_id"],
-                    student["name"],
-                    student["email"],
-                    student["phone"] or "N/A"
+                    User["campus_id"],
+                    User["name"],
+                    User["email"],
+                    User["phone"] or "N/A"
                 ]
                 for col_idx, val in enumerate(row_data, 1):
                     c = ws.cell(row=row_num, column=col_idx, value=val)
@@ -731,7 +732,7 @@ async def export_consolidated_excel(
 
                 for d_idx, d in enumerate(dates, 1):
                     col = FIXED_COLS + d_idx
-                    present = student["attendance"].get(d, False)
+                    present = User["attendance"].get(d, False)
                     c = ws.cell(row=row_num, column=col, value="✅" if present else "❌")
                     c.alignment = Alignment(horizontal="center", vertical="center")
                     c.font = Font(size=12)

@@ -1,36 +1,45 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.database import engine, Base, AsyncSessionLocal
+from app.models.user import User
+from app.models.rbac import Role
+from sqlalchemy.future import select
 
 app = FastAPI(
     title="Smart Classroom Attendance Management System (SCAMS)",
-    description="Backend API for SCAMS",
-    version="1.0.0",
+    description="Backend API for SCAMS - Phase 2 IAM",
+    version="2.0.0",
 )
-
-from app.config import settings
-from app.database import engine, Base, AsyncSessionLocal
-from app.models.faculty import Faculty
-from passlib.context import CryptContext
-from sqlalchemy.future import select
 
 @app.on_event("startup")
 async def startup_event():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        
+    # Database migration happens via Alembic, but we can seed the super admin here
     async with AsyncSessionLocal() as db:
-        stmt = select(Faculty).where(Faculty.email == "faculty@test.com")
+        # Create Super Admin Role if not exists
+        stmt = select(Role).where(Role.name == "Super Admin")
+        result = await db.execute(stmt)
+        admin_role = result.scalars().first()
+        if not admin_role:
+            admin_role = Role(name="Super Admin")
+            db.add(admin_role)
+            await db.commit()
+            await db.refresh(admin_role)
+
+        # Create admin user
+        stmt = select(User).where(User.email == "faculty@test.com")
         result = await db.execute(stmt)
         if not result.scalars().first():
             from app.api.auth import get_password_hash
             hashed_password = get_password_hash("SCAMS@yenepoya!")
-            new_faculty = Faculty(
-                name="Test Faculty",
+            new_admin = User(
                 email="faculty@test.com",
+                campus_id="ADMIN001",
                 password_hash=hashed_password,
-                department="Computer Science"
+                role_id=admin_role.id,
+                status="active"
             )
-            db.add(new_faculty)
+            db.add(new_admin)
             await db.commit()
 
 # CORS configuration
@@ -46,17 +55,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api import auth, attendance, session, analytics, matrix, students
+from app.api import auth, attendance, session, analytics, matrix, users, students
 from app.websocket import attendance_socket
 
 app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(students.router)
 app.include_router(attendance.router)
 app.include_router(session.router)
 app.include_router(analytics.router)
 app.include_router(matrix.router)
-app.include_router(students.router)
 app.include_router(attendance_socket.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to SCAMS API"}
+    return {"message": "Welcome to SCAMS API Phase 2"}

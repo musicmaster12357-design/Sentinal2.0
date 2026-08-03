@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.attendance import AttendanceRecord
 from app.models.session import AttendanceSession
-from app.models.student import Student
+from app.models.user import User
 from app.models.student_session_detail import StudentSessionDetail
 from app.schemas.attendance import SessionFormRequest
 from fastapi import HTTPException

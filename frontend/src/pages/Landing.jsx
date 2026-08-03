@@ -37,7 +37,7 @@ export default function Landing() {
           
           <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-4">
             <Link to="/faculty/login" className="btn-primary w-full py-4 text-lg font-semibold flex justify-center items-center gap-3">
-              <UserCircle size={24} /> Enter Portal
+              <UserCircle size={24} /> Faculty Login
             </Link>
             <Link to="/student/login" className="btn-secondary w-full py-4 text-lg font-semibold flex justify-center items-center gap-3">
               <QrCode size={24} /> Student Login

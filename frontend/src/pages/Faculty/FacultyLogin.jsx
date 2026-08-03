@@ -16,9 +16,15 @@ export default function FacultyLogin() {
 
   React.useEffect(() => {
     if (token) {
-      navigate('/faculty/dashboard');
+      if (user) {
+        if (user.role.toLowerCase() === 'student') {
+          navigate('/student/dashboard');
+        } else {
+          navigate('/faculty/dashboard');
+        }
+      }
     }
-  }, [token, navigate]);
+  }, [token, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +35,7 @@ export default function FacultyLogin() {
       setToken(res.data.access_token);
       localStorage.setItem('token', res.data.access_token);
       
-      const profileRes = await api.get('/auth/profile/me');
+      const profileRes = await api.get('/users/me');
       setUser(profileRes.data);
       
       navigate('/faculty/dashboard');

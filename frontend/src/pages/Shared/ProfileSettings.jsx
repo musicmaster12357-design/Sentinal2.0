@@ -46,8 +46,16 @@ export default function ProfileSettings() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.put('/auth/profile/me', formData);
-      setUser(res.data);
+      await api.put('/users/me', {
+        name: formData.name,
+        phone: formData.phone,
+        department: formData.department,
+        course: formData.course,
+        specialisation: formData.specialisation,
+        semester: formData.semester
+      });
+      const updatedUser = await api.get('/users/me');
+      setUser(updatedUser.data);
       toast.success('Profile updated successfully!');
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to update profile');
@@ -120,7 +128,7 @@ export default function ProfileSettings() {
                 />
               </div>
 
-              {user?.role === 'student' && (
+              {user?.role && user.role.toLowerCase() === 'student' && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Campus ID (Read-only)</label>
@@ -225,7 +233,7 @@ export default function ProfileSettings() {
                 </>
               )}
               
-              {user?.role === 'faculty' && (
+              {user?.role && (user.role.toLowerCase() === 'faculty' || user.role === 'Super Admin') && (
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Department</label>
                   <div className="relative group w-full">

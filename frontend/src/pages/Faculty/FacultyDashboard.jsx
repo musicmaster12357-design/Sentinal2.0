@@ -102,7 +102,7 @@ export default function FacultyDashboard() {
                 </div>
                 <div>
                   <p className="text-text-muted text-sm font-medium">Feedback Rating</p>
-                  <h3 className="text-2xl font-bold mt-1">4.8 <span className="text-sm text-text-muted font-normal">avg</span></h3>
+                  <h3 className="text-2xl font-bold mt-1">{stats?.feedback_rating || "0.0"} <span className="text-sm text-text-muted font-normal">avg</span></h3>
                 </div>
               </Card>
               

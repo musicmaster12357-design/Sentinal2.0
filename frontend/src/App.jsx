@@ -20,7 +20,7 @@ import { ToastContainer } from './components/ui/Toast';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/attendance">
       <ToastContainer />
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -67,6 +67,9 @@ function App() {
         <Route path="/faculty/session/:id" element={
           <ProtectedRoute role="faculty"><LiveSession /></ProtectedRoute>
         } />
+        
+        {/* Catch-all Route for 404s */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

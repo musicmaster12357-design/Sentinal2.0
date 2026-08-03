@@ -1,7 +1,7 @@
 import hmac
 import hashlib
 import time
-from app.config import settings
+from app.core.config import settings
 
 def generate_qr_signature(session_id: int, nonce: str, issued_at: int, expires: int) -> str:
     payload = f"{session_id}:{nonce}:{issued_at}:{expires}"
