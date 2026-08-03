@@ -25,6 +25,18 @@ async def startup_event():
             db.add(admin_role)
             await db.commit()
             await db.refresh(admin_role)
+            
+        # Seed Faculty Role
+        stmt = select(Role).where(Role.name == "Faculty")
+        if not (await db.execute(stmt)).scalars().first():
+            db.add(Role(name="Faculty"))
+            
+        # Seed Student Role
+        stmt = select(Role).where(Role.name == "Student")
+        if not (await db.execute(stmt)).scalars().first():
+            db.add(Role(name="Student"))
+            
+        await db.commit()
 
         # Create admin user
         stmt = select(User).where(User.email == "faculty@test.com")
