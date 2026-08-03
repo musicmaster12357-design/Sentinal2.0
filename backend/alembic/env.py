@@ -24,7 +24,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import Base
 from app.core.config import settings
-import app.models
+# Import all models here so Alembic can discover them
+from app.models.user import User
+from app.models.rbac import Role, Permission
+from app.models.academic import Department, Course, Semester, Section, Subject, Enrollment
+from app.models.session import AttendanceSession
+from app.models.attendance import AttendanceRecord
+from app.models.student_session_detail import StudentSessionDetail
 
 target_metadata = Base.metadata
 config.set_main_option("sqlalchemy.url", settings.get_database_url)
