@@ -8,7 +8,9 @@ import api from '../../services/api';
 function SessionTimings({ startTime, endTime }) {
   const formatTime = (timeStr) => {
     if (!timeStr) return '';
-    const utcStr = timeStr.endsWith('Z') ? timeStr : timeStr + 'Z';
+    // Postgres ISO strings often have timezones (e.g., +00:00). Appending Z to these breaks Date parsing.
+    const isNaive = !timeStr.endsWith('Z') && !timeStr.match(/([+-]\d{2}:\d{2})$/);
+    const utcStr = isNaive ? timeStr + 'Z' : timeStr;
     return new Date(utcStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -111,7 +113,7 @@ export default function LiveSession() {
 
   const endSession = async () => {
     try {
-      await api.post(`/session/${id}/close`);
+      await api.post(`/session/${id}/end`);
       navigate('/faculty/dashboard');
     } catch (err) {
       const msg = err.response?.data?.detail || err.message;
