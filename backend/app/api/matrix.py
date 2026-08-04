@@ -318,7 +318,7 @@ async def export_feedback_excel(
         
     # Query all students who attended and their feedback
     stmt = (
-        select(Student, StudentSessionDetail)
+        select(User, StudentSessionDetail)
         .join(AttendanceRecord, User.id == AttendanceRecord.student_id)
         .join(StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id)
         .where(AttendanceRecord.session_id == session_id)
@@ -464,7 +464,7 @@ async def export_feedback_excel_by_date(
     
     # Query all students who attended and their feedback
     stmt = (
-        select(Student, StudentSessionDetail, AttendanceRecord.session_id)
+        select(User, StudentSessionDetail, AttendanceRecord.session_id)
         .join(AttendanceRecord, User.id == AttendanceRecord.student_id)
         .join(StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id)
         .where(AttendanceRecord.session_id.in_(session_ids))

@@ -31,11 +31,19 @@ async def get_dashboard_stats(User: User = Depends(get_current_user), db: AsyncS
     res = await db.execute(stmt)
     total_attendance = res.scalar() or 0
     
+    # Calculate average feedback rating
+    stmt = select(func.avg(StudentSessionDetail.overall_satisfaction)).join(AttendanceRecord).join(AttendanceSession).where(
+        AttendanceSession.faculty_id == User.id,
+        StudentSessionDetail.overall_satisfaction != None
+    )
+    res = await db.execute(stmt)
+    avg_rating = res.scalar() or 0.0
+    
     return {
         "total_sessions": total_sessions,
         "active_session": active_session.id if active_session else None,
         "total_attendance": total_attendance,
-        "feedback_rating": 0.0
+        "feedback_rating": round(avg_rating, 1)
     }
 
 @router.get("/session/{session_id}/report")

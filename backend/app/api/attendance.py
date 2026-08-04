@@ -312,9 +312,16 @@ async def get_attendance_history(db: AsyncSession = Depends(get_db), current_use
             "timestamp": record.timestamp.replace(microsecond=0).isoformat() if record.timestamp else None
         })
         
+    from sqlalchemy import func
+    total_stmt = select(func.count(AttendanceSession.id))
+    total_res = await db.execute(total_stmt)
+    total_sessions = total_res.scalar() or 0
+    
+    percentage = round((len(records) / total_sessions) * 100) if total_sessions > 0 else 100
+    
     return {
         "history": history,
-        "percentage": 100 # Default to 100% until enrollment logic is built in Phase 3
+        "percentage": percentage
     }
 
 
