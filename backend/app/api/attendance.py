@@ -385,7 +385,6 @@ async def get_faculty_sessions(db: AsyncSession = Depends(get_db), current_user:
     return [{
         "id": s.id,
         "subject_id": s.subject_id,
-        "semester": s.semester,
         "start_time": s.start_time.isoformat() if s.start_time else None,
         "end_time": s.end_time.isoformat() if s.end_time else None,
         "status": s.status
@@ -401,7 +400,7 @@ async def get_session_attendees(session_id: int, db: AsyncSession = Depends(get_
         User, AttendanceRecord.student_id == User.id
     ).outerjoin(
         StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id
-    ).where(
+    ).options(selectinload(User.profile)).where(
         AttendanceRecord.session_id == session_id,
         AttendanceRecord.status == "present"
     )
@@ -412,12 +411,12 @@ async def get_session_attendees(session_id: int, db: AsyncSession = Depends(get_
     return [{
         "id": r.id,
         "student_id": s.id,
-        "name": s.name,
+        "name": (s.profile.name if s.profile else 'N/A'),
         "email": s.email,
-        "department": s.department,
-        "course": s.course,
-        "specialisation": s.specialisation,
-        "semester": s.semester,
+        "department": (s.profile.department if s.profile else 'N/A'),
+        "course": (s.profile.course if s.profile else 'N/A'),
+        "specialisation": (s.profile.specialisation if s.profile else 'N/A'),
+        "semester": (s.profile.semester if s.profile else 'N/A'),
         "time": r.timestamp.isoformat() if r.timestamp else None,
         "campus_id": s.campus_id,
         "interactive_rating": d.interactive_rating if d else None,
@@ -460,7 +459,7 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: Us
         return dt.astimezone(IST).isoformat()
 
     return [{
-        "student_name": s.name,
+        "student_name": (s.profile.name if s.profile else 'N/A'),
         "campus_id": s.campus_id,
         "session_id": sess.id,
         "subject_id": sess.subject_id,
@@ -473,6 +472,6 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: Us
         "submitted_time": to_ist_iso(d.submitted_time),
         "email": s.email,
         "phone": s.phone,
-        "course": s.course,
-        "specialisation": s.specialisation
+        "course": (s.profile.course if s.profile else 'N/A'),
+        "specialisation": (s.profile.specialisation if s.profile else 'N/A')
     } for r, s, d, sess in records]
