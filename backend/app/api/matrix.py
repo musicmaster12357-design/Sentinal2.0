@@ -42,7 +42,7 @@ async def get_attendance_matrix(
         return {"sessions": [], "students": [], "grouped_students": {}}
         
     from app.models.rbac import Role
-    stmt_students = select(User).join(Role, User.role_id == Role.id).where(Role.name == 'student').options(selectinload(User.profile))
+    stmt_students = select(User).join(Role, User.role_id == Role.id).where(Role.name.ilike('student')).options(selectinload(User.profile))
     res_students = await db.execute(stmt_students)
     students = res_students.scalars().all()
     
@@ -589,7 +589,7 @@ async def get_consolidated_attendance_matrix(
         return {"dates": [], "grouped_students": {}}
         
     from app.models.rbac import Role
-    stmt_students = select(User).join(Role, User.role_id == Role.id).where(Role.name == 'student').options(selectinload(User.profile))
+    stmt_students = select(User).join(Role, User.role_id == Role.id).where(Role.name.ilike('student')).options(selectinload(User.profile))
     res_students = await db.execute(stmt_students)
     students = res_students.scalars().all()
     
