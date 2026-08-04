@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.dependencies import get_current_faculty
-from app.schemas.user import TokenData
+from app.core.permissions import get_current_user
+from app.models.user import User
 from datetime import date, datetime
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
