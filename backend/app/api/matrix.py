@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.core.permissions import get_current_user
 from app.models.user import User
@@ -40,7 +41,7 @@ async def get_attendance_matrix(
     if not day_sessions:
         return {"sessions": [], "students": [], "grouped_students": {}}
         
-    stmt_students = select(User)
+    stmt_students = select(User).options(selectinload(User.profile))
     res_students = await db.execute(stmt_students)
     students = res_students.scalars().all()
     
@@ -64,12 +65,12 @@ async def get_attendance_matrix(
         s_data = {
             "id": s.id,
             "campus_id": s.campus_id,
-            "name": s.name,
+            "name": (s.profile.name if s.profile else 'N/A'),
             "email": s.email,
-            "phone": s.phone,
-            "course": s.course,
-            "specialisation": s.specialisation,
-            "semester": s.semester,
+            "phone": (s.profile.phone if s.profile else 'N/A'),
+            "course": (s.profile.course if s.profile else 'N/A'),
+            "specialisation": (s.profile.specialisation if s.profile else 'N/A'),
+            "semester": (s.profile.semester if s.profile else 'N/A'),
             "attendance": {sid: att_map.get(s.id, {}).get(sid, False) for sid in session_ids}
         }
         student_list.append(s_data)
@@ -328,7 +329,7 @@ async def export_feedback_excel(
     # Group by course+specialisation
     grouped_feedbacks = {}
     for user_obj, feedback in records:
-        key = f"{user_obj.course or 'Unknown'}({user_obj.specialisation or 'None'})"
+        key = f"{(user_obj.profile.course if user_obj.profile else 'N/A') or 'Unknown'}({(user_obj.profile.specialisation if user_obj.profile else 'N/A') or 'None'})"
         if key not in grouped_feedbacks:
             grouped_feedbacks[key] = []
         grouped_feedbacks[key].append((user_obj, feedback))
@@ -387,7 +388,7 @@ async def export_feedback_excel(
                 row_data = [
                     i,
                     user_obj.campus_id,
-                    user_obj.name,
+                    (user_obj.profile.name if user_obj.profile else 'N/A'),
                     f"{feedback.interactive_rating}/5" if feedback.interactive_rating else "N/A",
                     f"{feedback.relevant_rating}/5" if feedback.relevant_rating else "N/A",
                     feedback.learned_today or "N/A",
@@ -534,7 +535,7 @@ async def export_feedback_excel_by_date(
                 row_data = [
                     i,
                     user_obj.campus_id,
-                    user_obj.name,
+                    (user_obj.profile.name if user_obj.profile else 'N/A'),
                     f"{feedback.interactive_rating}/5" if feedback.interactive_rating else "N/A",
                     f"{feedback.relevant_rating}/5" if feedback.relevant_rating else "N/A",
                     feedback.learned_today or "N/A",
@@ -585,7 +586,7 @@ async def get_consolidated_attendance_matrix(
     if not all_sessions:
         return {"dates": [], "grouped_students": {}}
         
-    stmt_students = select(User)
+    stmt_students = select(User).options(selectinload(User.profile))
     res_students = await db.execute(stmt_students)
     students = res_students.scalars().all()
     
@@ -621,12 +622,12 @@ async def get_consolidated_attendance_matrix(
         s_data = {
             "id": s.id,
             "campus_id": s.campus_id,
-            "name": s.name,
+            "name": (s.profile.name if s.profile else 'N/A'),
             "email": s.email,
-            "phone": s.phone,
-            "course": s.course,
-            "specialisation": s.specialisation,
-            "semester": s.semester,
+            "phone": (s.profile.phone if s.profile else 'N/A'),
+            "course": (s.profile.course if s.profile else 'N/A'),
+            "specialisation": (s.profile.specialisation if s.profile else 'N/A'),
+            "semester": (s.profile.semester if s.profile else 'N/A'),
             "attendance": {d: att_map.get(s.id, {}).get(d, False) for d in unique_dates}
         }
         student_list.append(s_data)
