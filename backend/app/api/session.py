@@ -210,3 +210,10 @@ async def get_websocket_url(session_id: int, current_user: User = Depends(get_cu
         ws_base = "ws"
         
     return {"ws_url": f"{ws_base}://localhost:8000/ws/attendance/{session_id}"}
+
+@router.delete("/wipe/all_dangerous")
+async def wipe_all_sessions(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    await db.execute(text("TRUNCATE TABLE attendance_sessions CASCADE;"))
+    await db.commit()
+    return {"message": "All sessions wiped."}
