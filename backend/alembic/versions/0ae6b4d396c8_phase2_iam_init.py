@@ -24,15 +24,15 @@ def upgrade() -> None:
 
     # Old tables are dropped safely by reset_db.py, 
     # but we also drop any remaining ones with IF EXISTS here to be safe
-    op.execute("DROP TABLE IF EXISTS student_session_details CASCADE")
-    op.execute("DROP TABLE IF EXISTS attendance CASCADE")
-    op.execute("DROP TABLE IF EXISTS enrollments CASCADE")
-    op.execute("DROP TABLE IF EXISTS attendance_sessions CASCADE")
-    op.execute("DROP TABLE IF EXISTS subjects CASCADE")
-    op.execute("DROP TABLE IF EXISTS sessions CASCADE")
-    op.execute("DROP TABLE IF EXISTS sections CASCADE")
-    op.execute("DROP TABLE IF EXISTS students CASCADE")
-    op.execute("DROP TABLE IF EXISTS faculty CASCADE")
+    op.execute("DROP TABLE IF EXISTS student_session_details")
+    op.execute("DROP TABLE IF EXISTS attendance")
+    op.execute("DROP TABLE IF EXISTS enrollments")
+    op.execute("DROP TABLE IF EXISTS attendance_sessions")
+    op.execute("DROP TABLE IF EXISTS subjects")
+    op.execute("DROP TABLE IF EXISTS sessions")
+    op.execute("DROP TABLE IF EXISTS sections")
+    op.execute("DROP TABLE IF EXISTS students")
+    op.execute("DROP TABLE IF EXISTS faculty")
     op.create_table('departments',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),

@@ -22,8 +22,22 @@ export default function StudentRegister() {
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(true);
+  const [checkingRegistration, setCheckingRegistration] = useState(true);
   const navigate = useNavigate();
   const { setToken, setUser } = useAuthStore();
+
+  React.useEffect(() => {
+    api.get('/auth/settings/registration')
+      .then(res => {
+        setRegistrationOpen(res.data.registration_open);
+        setCheckingRegistration(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch registration settings", err);
+        setCheckingRegistration(false);
+      });
+  }, []);
 
   const handleLookup = async () => {
     if (formData.campus_id.length < 3) {
@@ -121,7 +135,19 @@ export default function StudentRegister() {
             </motion.div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-5">
+          {checkingRegistration ? (
+             <div className="flex justify-center p-8"><Loader2 className="animate-spin text-slate-400" size={32} /></div>
+          ) : !registrationOpen ? (
+             <div className="text-center p-8 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+               <AlertCircle size={48} className="text-amber-500 mx-auto mb-4" />
+               <h3 className="text-xl font-bold text-amber-500 mb-2">Registration Closed</h3>
+               <p className="text-amber-400/80">Account registration is currently disabled by the administrator. Please try again later or contact your faculty.</p>
+               <div className="mt-6">
+                 <Link to="/student/login" className="text-blue-400 hover:text-blue-300 transition-colors">Return to Login</Link>
+               </div>
+             </div>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-5">
             {/* ROW 1 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
@@ -317,6 +343,7 @@ export default function StudentRegister() {
               )}
             </button>
           </form>
+          )}
 
           <div className="mt-8 text-center">
             <p className="text-slate-400 text-sm">

@@ -18,6 +18,7 @@ export default function FacultyDashboard() {
   const { user } = useAuthStore();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [registrationOpen, setRegistrationOpen] = useState(true);
   
   const [startTime, setStartTime] = useState('09:30');
   const [endTime, setEndTime] = useState('11:00');
@@ -36,7 +37,23 @@ export default function FacultyDashboard() {
         toast.error("Failed to load dashboard data");
         setLoading(false);
       });
+      
+    api.get('/auth/settings/registration')
+      .then(res => {
+        setRegistrationOpen(res.data.registration_open);
+      })
+      .catch(err => console.error(err));
   }, []);
+
+  const toggleRegistration = async () => {
+    try {
+      const res = await api.post('/auth/settings/registration');
+      setRegistrationOpen(res.data.registration_open);
+      toast.success(`Registration is now ${res.data.registration_open ? 'Open' : 'Closed'}`);
+    } catch (err) {
+      toast.error("Failed to toggle registration settings");
+    }
+  };
 
   const handleStartSession = async (e) => {
     e.preventDefault();
@@ -106,14 +123,16 @@ export default function FacultyDashboard() {
                 </div>
               </Card>
               
-              <Card hover className="flex items-center gap-4 border-status-success/20">
-                <div className="w-12 h-12 rounded-xl bg-status-success/20 flex items-center justify-center text-status-success relative">
-                  <span className="absolute top-0 right-0 w-3 h-3 bg-status-success rounded-full animate-ping"></span>
+              <Card hover className={`flex items-center gap-4 cursor-pointer transition-colors ${registrationOpen ? 'border-status-success/20' : 'border-amber-500/20'}`} onClick={toggleRegistration}>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center relative ${registrationOpen ? 'bg-status-success/20 text-status-success' : 'bg-amber-500/20 text-amber-500'}`}>
+                  <span className={`absolute top-0 right-0 w-3 h-3 rounded-full animate-ping ${registrationOpen ? 'bg-status-success' : 'bg-amber-500'}`}></span>
                   <ShieldCheck size={24} />
                 </div>
                 <div>
-                  <p className="text-text-muted text-sm font-medium">System Status</p>
-                  <h3 className="text-xl font-bold text-status-success mt-1">Online</h3>
+                  <p className="text-text-muted text-sm font-medium">Student Registration</p>
+                  <h3 className={`text-lg font-bold mt-1 ${registrationOpen ? 'text-status-success' : 'text-amber-500'}`}>
+                    {registrationOpen ? 'Open (Click to Lock)' : 'Closed (Click to Open)'}
+                  </h3>
                 </div>
               </Card>
             </>

@@ -101,8 +101,7 @@ async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: Asy
     stmt = select(AttendanceSession).where(
         AttendanceSession.id == session_id,
         AttendanceSession.faculty_id == current_user.id,
-        AttendanceSession.status == "active",
-        AttendanceSession.is_active == True
+        AttendanceSession.status == "active"
     )
     res = await db.execute(stmt)
     session = res.scalars().first()
@@ -111,16 +110,17 @@ async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: Asy
         raise HTTPException(status_code=400, detail="Invalid or inactive session.")
         
     # Find User by campus_id
-    student_stmt = select(User).where(User.campus_id == data.campus_id)
+    from sqlalchemy.orm import selectinload
+    student_stmt = select(User).options(selectinload(User.profile)).where(User.campus_id == data.campus_id)
     student_res = await db.execute(student_stmt)
-    User = student_res.scalars().first()
+    student = student_res.scalars().first()
     
-    if not User:
+    if not student:
         raise HTTPException(status_code=404, detail="User not found with this Campus ID.")
         
     # Check if User already marked attendance
     existing_attendance_stmt = select(AttendanceRecord).where(
-        AttendanceRecord.student_id == User.id,
+        AttendanceRecord.student_id == student.id,
         AttendanceRecord.session_id == session.id,
         AttendanceRecord.status == "present"
     )
@@ -134,7 +134,7 @@ async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: Asy
     # Create attendance record
     record = AttendanceRecord(
         session_id=session.id,
-        student_id=User.id,
+        student_id=student.id,
         timestamp=datetime.now(timezone.utc),
         status="present",
         workflow_state="confirmed"
@@ -154,14 +154,14 @@ async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: Asy
     # Broadcast to User websocket
     from app.websocket.attendance_socket import manager
     await manager.broadcast_attendance_update(session.id, {
-        "student_id": User.id,
-        "name": User.name,
-        "email": User.email,
-        "department": User.department,
-        "course": User.course,
-        "specialisation": User.specialisation,
-        "semester": User.semester,
-        "campus_id": User.campus_id,
+        "student_id": student.id,
+        "name": student.profile.name if student.profile else "Unknown",
+        "email": student.email,
+        "department": student.profile.department_name if student.profile else None,
+        "course": student.profile.course_name if student.profile else None,
+        "specialisation": student.profile.specialisation if student.profile else None,
+        "semester": student.profile.semester_name if student.profile else None,
+        "campus_id": student.campus_id,
         "time": (record.timestamp.isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.isoformat() if record.timestamp else None),
         "status": record.status,
         "interactive_rating": detail.interactive_rating,
@@ -256,20 +256,21 @@ async def submit_feedback(data: SessionFormRequest, db: AsyncSession = Depends(g
         
         # Broadcast the updated details to the User websocket
         from app.models.user import User
-        student_stmt = select(User).where(User.id == current_user.id)
+        from sqlalchemy.orm import selectinload
+        student_stmt = select(User).options(selectinload(User.profile)).where(User.id == current_user.id)
         student_res = await db.execute(student_stmt)
-        User = student_res.scalars().first()
+        student = student_res.scalars().first()
         
         from app.websocket.attendance_socket import manager
         await manager.broadcast_attendance_update(data.session_id, {
             "student_id": current_user.id,
-            "name": User.name if User else None,
+            "name": student.profile.name if student and student.profile else "Unknown",
             "email": current_user.email,
-            "department": User.department if User else None,
-            "course": User.course if User else None,
-            "specialisation": User.specialisation if User else None,
-            "semester": User.semester if User else None,
-            "campus_id": User.campus_id if User else None,
+            "department": student.profile.department_name if student and student.profile else None,
+            "course": student.profile.course_name if student and student.profile else None,
+            "specialisation": student.profile.specialisation if student and student.profile else None,
+            "semester": student.profile.semester_name if student and student.profile else None,
+            "campus_id": student.campus_id if student else None,
             "time": (record.timestamp.isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.isoformat() if record.timestamp else None),
             "status": record.status,
             "interactive_rating": detail.interactive_rating,

@@ -1,8 +1,8 @@
-"""Restore phase 1 core tables
+"""Restore phase 1 missing tables
 
-Revision ID: 58abb42e3483
+Revision ID: baeee921c94a
 Revises: 0ae6b4d396c8
-Create Date: 2026-08-03 15:27:02.529070
+Create Date: 2026-08-03 16:01:43.946863
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '58abb42e3483'
+revision: str = 'baeee921c94a'
 down_revision: Union[str, Sequence[str], None] = '0ae6b4d396c8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

@@ -54,6 +54,12 @@ async def refresh_token(data: RefreshRequest, db: AsyncSession = Depends(get_db)
 
 @router.post("/register")
 async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
+    from app.models.settings import SystemSettings
+    setting = await db.execute(select(SystemSettings).where(SystemSettings.key == "registration_open"))
+    setting_obj = setting.scalars().first()
+    if setting_obj and setting_obj.value == "false":
+        raise HTTPException(status_code=403, detail="Registration is currently closed by the administrator")
+
     # Check if email exists
     result = await db.execute(select(User).where(User.email == data.email))
     if result.scalars().first():
@@ -97,3 +103,43 @@ async def logout(current_user: User = Depends(get_current_user), db: AsyncSessio
     # In a real system, we'd revoke the refresh token and mark the session inactive
     # For now, it's handled via client-side token deletion
     return {"message": "Logged out successfully"}
+
+@router.get("/settings/registration")
+async def get_registration_setting(db: AsyncSession = Depends(get_db)):
+    from app.models.settings import SystemSettings
+    setting = await db.execute(select(SystemSettings).where(SystemSettings.key == "registration_open"))
+    setting_obj = setting.scalars().first()
+    is_open = True
+    if setting_obj and setting_obj.value == "false":
+        is_open = False
+    return {"registration_open": is_open}
+
+@router.post("/settings/registration")
+async def toggle_registration_setting(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # Only faculty/admin should toggle
+    from app.models.rbac import Role
+    role_stmt = select(Role).where(Role.id == current_user.role_id)
+    role_res = await db.execute(role_stmt)
+    role = role_res.scalars().first()
+    
+    if not role or role.name == "student":
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    from app.models.settings import SystemSettings
+    setting = await db.execute(select(SystemSettings).where(SystemSettings.key == "registration_open"))
+    setting_obj = setting.scalars().first()
+    
+    is_open = True
+    if setting_obj:
+        is_open = setting_obj.value != "false"
+        setting_obj.value = "false" if is_open else "true"
+        is_open = not is_open
+    else:
+        # Default is true, so first toggle makes it false
+        setting_obj = SystemSettings(key="registration_open", value="false")
+        db.add(setting_obj)
+        is_open = False
+        
+    await db.commit()
+    return {"registration_open": is_open}
+
