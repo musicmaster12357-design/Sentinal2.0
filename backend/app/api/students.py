@@ -90,3 +90,49 @@ async def delete_student(student_id: int, db: AsyncSession = Depends(get_db), cu
     await db.delete(student)
     await db.commit()
     return {"message": "Student deleted successfully"}
+
+
+class StudentUpdate(BaseModel):
+    name: str | None = None
+    campus_id: str | None = None
+    email: str | None = None
+    specialisation: str | None = None
+    password: str | None = None
+
+@router.put("/{student_id}")
+async def update_student(student_id: int, data: StudentUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt = select(User).options(selectinload(User.profile)).where(User.id == student_id)
+    res = await db.execute(stmt)
+    student = res.scalars().first()
+    
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    if data.email:
+        student.email = data.email
+    if data.campus_id:
+        student.campus_id = data.campus_id
+    if data.password:
+        student.password_hash = get_password_hash(data.password)
+        
+    if student.profile:
+        if data.name:
+            student.profile.name = data.name
+        if data.specialisation:
+            student.profile.specialisation = data.specialisation
+            
+    await db.commit()
+    return {"message": "Student updated successfully"}
+
+@router.post("/{student_id}/reset-password")
+async def reset_password(student_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt = select(User).where(User.id == student_id)
+    res = await db.execute(stmt)
+    student = res.scalars().first()
+    
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+        
+    student.password_hash = get_password_hash("password123")
+    await db.commit()
+    return {"message": "Password reset to default (password123)"}
