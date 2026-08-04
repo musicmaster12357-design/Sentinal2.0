@@ -31,7 +31,7 @@ function SessionTimings({ startTime, endTime }) {
         <span>Active Session</span>
       </div>
       <div className="text-sm font-medium opacity-80 flex items-center gap-1">
-        <Clock size={14} /> Allotted: {formattedStart} - {formattedEnd}
+        <Clock size={14} /> Session Time: {formattedStart || '--:--'} - {formattedEnd || '--:--'}
       </div>
     </div>
   );
