@@ -7,7 +7,7 @@ class StudentSessionDetail(Base):
     __tablename__ = "student_session_details"
 
     id = Column(Integer, primary_key=True, index=True) # Maps to detail_id
-    attendance_id = Column(Integer, ForeignKey("attendance.id"), nullable=False, unique=True)
+    attendance_id = Column(Integer, ForeignKey("attendance.id", ondelete="CASCADE"), nullable=False, unique=True)
     interactive_rating = Column(Integer, nullable=False, default=0)
     relevant_rating = Column(Integer, nullable=False, default=0)
     learned_today = Column(String, nullable=False, default="")
