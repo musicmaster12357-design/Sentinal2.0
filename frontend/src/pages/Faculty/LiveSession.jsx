@@ -3,15 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, StopCircle, CheckCircle2, AlertCircle, Clock, Timer, X } from 'lucide-react';
 import api from '../../services/api';
+import { toast } from '../../store/toastStore';
 
 // Timing component
 function SessionTimings({ startTime, endTime }) {
   const formatTime = (timeStr) => {
     if (!timeStr) return '';
-    // Postgres ISO strings often have timezones (e.g., +00:00). Appending Z to these breaks Date parsing.
-    const isNaive = !timeStr.endsWith('Z') && !timeStr.match(/([+-]\d{2}:\d{2})$/);
-    const utcStr = isNaive ? timeStr + 'Z' : timeStr;
-    return new Date(utcStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Fix for browsers that reject 6-digit microseconds in ISO strings
+    let cleanStr = timeStr;
+    if (typeof timeStr === 'string') {
+      cleanStr = timeStr.replace(/(\.\d{3})\d+/, '$1');
+    }
+    const isNaive = typeof cleanStr === 'string' && !cleanStr.endsWith('Z') && !cleanStr.match(/([+-]\d{2}:\d{2})$/);
+    const utcStr = isNaive ? cleanStr + 'Z' : cleanStr;
+    const dateObj = new Date(utcStr);
+    if (isNaN(dateObj.getTime())) return timeStr; // Fallback to raw string if still invalid
+    return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const formattedStart = formatTime(startTime);
@@ -62,6 +69,10 @@ export default function LiveSession() {
 
       const infoRes = await api.get(`/session/${id}/info`);
       setSessionInfo(infoRes.data);
+      if (infoRes.data.status === 'completed') {
+        toast.info("This session has already ended.");
+        navigate('/faculty/dashboard');
+      }
     } catch (err) {
       console.error("Polling failed", err);
       if (err.response && err.response.status === 404) {
