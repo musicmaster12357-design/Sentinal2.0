@@ -173,7 +173,7 @@ async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: Asy
     
     return {"message": "User marked present manually."}
 
-@router.delete("/session/{session_id}/User/{student_id}")
+@router.delete("/session/{session_id}/student/{student_id}")
 async def remove_attendance(session_id: int, student_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from app.models.attendance import AttendanceRecord
     from app.models.student_session_detail import StudentSessionDetail
@@ -368,7 +368,7 @@ async def get_session_state(session_id: int, current_user: User = Depends(get_cu
 
 
 
-@router.get("/User/sessions")
+@router.get("/faculty/sessions")
 async def get_faculty_sessions(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from app.models.session import AttendanceSession
     from app.models.attendance import AttendanceRecord
@@ -391,7 +391,7 @@ async def get_faculty_sessions(db: AsyncSession = Depends(get_db), current_user:
         "status": s.status
     } for s in sessions]
 
-@router.get("/User/sessions/{session_id}/attendees")
+@router.get("/faculty/sessions/{session_id}/attendees")
 async def get_session_attendees(session_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from app.models.attendance import AttendanceRecord
     from app.models.user import User
@@ -428,7 +428,7 @@ async def get_session_attendees(session_id: int, db: AsyncSession = Depends(get_
         "issue_note": d.issue_note if d else None
     } for r, s, d in records]
 
-@router.get("/User/feedbacks")
+@router.get("/faculty/feedbacks")
 async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from app.models.attendance import AttendanceRecord
     from app.models.user import User
