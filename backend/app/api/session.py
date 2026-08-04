@@ -75,16 +75,7 @@ async def start_session(data: SessionCreate, current_user: User = Depends(get_cu
         
     expires_unix = int((start_time + timedelta(days=3650)).timestamp())
 
-    # Auto-close old sessions
-    stmt_close = select(AttendanceSession).where(
-        AttendanceSession.faculty_id == current_user.id, 
-        AttendanceSession.status == "active"
-    )
-    res_close = await db.execute(stmt_close)
-    old_sessions = res_close.scalars().all()
-    for s in old_sessions:
-        s.status = "completed"
-        s.is_active = False
+    # Allow multiple concurrent active sessions
 
     new_session = AttendanceSession(
         faculty_id=current_user.id,
