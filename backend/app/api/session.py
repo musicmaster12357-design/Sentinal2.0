@@ -110,6 +110,7 @@ async def start_session(data: SessionCreate, current_user: User = Depends(get_cu
     }
 
 @router.post("/{session_id}/end")
+@router.post("/{session_id}/close")
 async def end_session(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from datetime import datetime, timezone
     
