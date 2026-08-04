@@ -36,7 +36,7 @@ async def get_attendance_matrix(
     res = await db.execute(stmt_sessions)
     all_sessions = res.scalars().all()
     
-    day_sessions = [s for s in all_sessions if s.start_time.date() == date]
+    day_sessions = [s for s in all_sessions if s.start_time and s.start_time.date() == date]
     
     if not day_sessions:
         return {"sessions": [], "students": [], "grouped_students": {}}
@@ -133,9 +133,10 @@ async def get_attendance_matrix(
     
     unique_dates = []
     for s in all_sessions:
-        d = s.start_time.date()
-        if d not in unique_dates:
-            unique_dates.append(d)
+        if s.start_time:
+            d = s.start_time.date()
+            if d not in unique_dates:
+                unique_dates.append(d)
             
     try:
         day_number = unique_dates.index(date) + 1

@@ -9,16 +9,17 @@ import { toast } from '../../store/toastStore';
 function SessionTimings({ startTime, endTime }) {
   const formatTime = (timeStr) => {
     if (!timeStr) return '';
-    // Fix for browsers that reject 6-digit microseconds in ISO strings
-    let cleanStr = timeStr;
-    if (typeof timeStr === 'string') {
-      cleanStr = timeStr.replace(/(\.\d{3})\d+/, '$1');
+    try {
+      let d = new Date(timeStr);
+      if (isNaN(d.getTime()) && typeof timeStr === 'string') {
+        // Fallback for strict browsers: replace +00:00 with Z
+        d = new Date(timeStr.replace('+00:00', 'Z'));
+      }
+      if (isNaN(d.getTime())) return timeStr;
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return timeStr;
     }
-    const isNaive = typeof cleanStr === 'string' && !cleanStr.endsWith('Z') && !cleanStr.match(/([+-]\d{2}:\d{2})$/);
-    const utcStr = isNaive ? cleanStr + 'Z' : cleanStr;
-    const dateObj = new Date(utcStr);
-    if (isNaN(dateObj.getTime())) return timeStr; // Fallback to raw string if still invalid
-    return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const formattedStart = formatTime(startTime);
