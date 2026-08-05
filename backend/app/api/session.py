@@ -177,9 +177,9 @@ async def get_active_session(current_user: User = Depends(get_current_user), db:
 
 @router.delete("/{session_id}")
 async def delete_session(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    from app.models.attendance import AttendanceRecord
-    from app.models.student_session_detail import StudentSessionDetail
+    from sqlalchemy import text
     
+    # 1. Verify session exists and belongs to user
     stmt = select(AttendanceSession).where(
         AttendanceSession.id == session_id,
         AttendanceSession.faculty_id == current_user.id
@@ -191,23 +191,35 @@ async def delete_session(session_id: int, current_user: User = Depends(get_curre
         raise HTTPException(status_code=404, detail="Session not found or not yours")
         
     try:
-        # Manually delete child records to bypass missing ON DELETE CASCADE constraint in DB
-        att_stmt = select(AttendanceRecord.id).where(AttendanceRecord.session_id == session_id)
-        att_res = await db.execute(att_stmt)
-        attendance_ids = list(att_res.scalars().all())
+        # 2. Get attendance IDs for this session
+        att_stmt = text("SELECT id FROM attendance WHERE session_id = :sid")
+        att_res = await db.execute(att_stmt, {"sid": session_id})
+        # Support both tuple/dict depending on driver
+        att_rows = att_res.fetchall()
         
-        if attendance_ids:
-            from sqlalchemy import delete
-            await db.execute(delete(StudentSessionDetail).where(StudentSessionDetail.attendance_id.in_(attendance_ids)))
-            await db.execute(delete(AttendanceRecord).where(AttendanceRecord.session_id == session_id))
+        # 3. If attendance exists, delete child records first
+        if att_rows:
+            attendance_ids = [row[0] for row in att_rows]
             
+            # Delete from student_session_details
+            # Using basic string formatting here is safe since attendance_ids are ints
+            ids_str = ",".join(map(str, attendance_ids))
+            del_details = text(f"DELETE FROM student_session_details WHERE attendance_id IN ({ids_str})")
+            await db.execute(del_details)
+            
+            # Delete from attendance
+            del_att = text("DELETE FROM attendance WHERE session_id = :sid")
+            await db.execute(del_att, {"sid": session_id})
+            
+        # 4. Finally delete the session itself
         await db.delete(session_obj)
         await db.commit()
         return {"message": "Session deleted successfully"}
+        
     except Exception as e:
+        await db.rollback()
         import traceback
-        err_msg = traceback.format_exc()
-        return {"error": str(e), "trace": err_msg}
+        return {"error": str(e), "trace": traceback.format_exc()}
 
 @router.get("/{session_id}/ws-url")
 async def get_websocket_url(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
