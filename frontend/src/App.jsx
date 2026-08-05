@@ -15,6 +15,7 @@ import StudentManagement from './pages/Faculty/StudentManagement';
 import AttendanceHistory from './pages/Faculty/AttendanceHistory';
 import FacultyFeedback from './pages/Faculty/FacultyFeedback';
 import ProfileSettings from './pages/Shared/ProfileSettings';
+import AttendanceLanding from './pages/Student/AttendanceLanding';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastContainer } from './components/ui/Toast';
 
@@ -26,6 +27,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/register" element={<Navigate to="/student/register" replace />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/attendance" element={<AttendanceLanding />} />
         
         {/* Student Routes */}
         <Route path="/student/login" element={<StudentLogin />} />

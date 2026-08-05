@@ -463,10 +463,12 @@ async def export_feedback_excel_by_date(
     session_map = {s.id: s for s in sessions}
     
     # Query all students who attended and their feedback
+    from app.models.user import Profile
     stmt = (
-        select(User, StudentSessionDetail, AttendanceRecord.session_id)
+        select(User, StudentSessionDetail, AttendanceRecord.session_id, Profile)
         .join(AttendanceRecord, User.id == AttendanceRecord.student_id)
         .join(StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id)
+        .outerjoin(Profile, User.id == Profile.user_id)
         .where(AttendanceRecord.session_id.in_(session_ids))
         .order_by(StudentSessionDetail.submitted_time)
     )

@@ -10,10 +10,14 @@ function SessionTimings({ startTime, endTime }) {
   const formatTime = (timeStr) => {
     if (!timeStr) return '';
     try {
-      let d = new Date(timeStr);
-      if (isNaN(d.getTime()) && typeof timeStr === 'string') {
+      let cleanStr = timeStr;
+      if (typeof timeStr === 'string' && !timeStr.endsWith('Z') && !timeStr.match(/([+-]\d{2}:\d{2})$/)) {
+        cleanStr += 'Z';
+      }
+      let d = new Date(cleanStr);
+      if (isNaN(d.getTime()) && typeof cleanStr === 'string') {
         // Fallback for strict browsers: replace +00:00 with Z
-        d = new Date(timeStr.replace('+00:00', 'Z'));
+        d = new Date(cleanStr.replace('+00:00', 'Z'));
       }
       if (isNaN(d.getTime())) return timeStr;
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -51,7 +55,7 @@ export default function LiveSession() {
 
   // Build the QR string from the static token
   const qrString = qrToken
-    ? `${window.location.origin}/attendance/student/verify-attendance/${qrToken}`
+    ? `${window.location.origin}/attendance?token=${qrToken}`
     : null;
 
   // Dynamically load QRCodeSVG to keep initial render fast
@@ -144,16 +148,27 @@ export default function LiveSession() {
       <div className="flex-1 flex flex-col items-center justify-center p-8 relative z-10">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
           <div className="badge badge-active mb-4 inline-block">Active Session: {sessionInfo?.subject_id}</div>
-          {sessionInfo?.title && (
+          {sessionInfo?.title ? (
              <h2 className="text-4xl font-bold text-white mb-2">{sessionInfo.title}</h2>
-          )}
-          {!sessionInfo?.title && (
+          ) : (
              <h2 className="text-4xl font-bold text-white mb-2">Scan to join</h2>
           )}
           {sessionInfo?.speaker && (
              <p className="text-blue-400 text-lg font-medium mb-2">Speaker: {sessionInfo.speaker}</p>
           )}
-          <p className="text-slate-400 text-sm">QR is valid for the entire session duration.</p>
+          <p className="text-slate-400 text-sm mb-4">QR is valid for the entire session duration.</p>
+          
+          {window.location.hostname === 'localhost' && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 max-w-md mx-auto flex items-start gap-3 text-left mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div>
+                <h4 className="text-amber-500 font-medium text-sm">Running on Localhost</h4>
+                <p className="text-amber-400/80 text-xs mt-1">
+                  Students cannot scan this QR from their phones unless you access this dashboard using your computer's Network IP address (e.g. http://192.168.x.x:5173).
+                </p>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         <motion.div

@@ -12,15 +12,19 @@ export default function StudentLogin() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { token, user, setToken, setUser } = useAuthStore();
+  const navigatedRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (token) {
-      if (user) {
-        if (user.role.toLowerCase() === 'student') {
-          navigate('/student/dashboard');
-        } else {
-          navigate('/faculty/dashboard');
-        }
+    if (token && user && !navigatedRef.current) {
+      navigatedRef.current = true;
+      const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectUrl) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectUrl);
+      } else if (user.role.toLowerCase() === 'student') {
+        navigate('/student/dashboard');
+      } else {
+        navigate('/faculty/dashboard');
       }
     }
   }, [token, user, navigate]);
@@ -36,10 +40,7 @@ export default function StudentLogin() {
       
       const profileRes = await api.get('/users/me');
       setUser(profileRes.data);
-      
-      const redirectUrl = sessionStorage.getItem('redirectAfterLogin') || '/student/dashboard';
-      sessionStorage.removeItem('redirectAfterLogin');
-      navigate(redirectUrl);
+      // Navigation is handled by the useEffect above
     } catch (err) {
       setError(err.response?.data?.detail || "Invalid email or password");
     } finally {

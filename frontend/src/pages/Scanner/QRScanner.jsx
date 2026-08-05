@@ -72,7 +72,14 @@ export default function QRScanner() {
 
       try {
         let qrData;
-        if (result.includes('/student/verify-attendance/')) {
+        if (result.includes('/attendance?token=')) {
+          const token = result.split('token=')[1];
+          const base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(
+            atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+          );
+          qrData = JSON.parse(jsonPayload);
+        } else if (result.includes('/student/verify-attendance/')) {
           const token = result.split('/student/verify-attendance/')[1];
           const base64 = token.replace(/-/g, '+').replace(/_/g, '/');
           const jsonPayload = decodeURIComponent(

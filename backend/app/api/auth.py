@@ -143,3 +143,35 @@ async def toggle_registration_setting(current_user: User = Depends(get_current_u
     await db.commit()
     return {"registration_open": is_open}
 
+from pydantic import BaseModel
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@router.post("/change-password")
+async def change_password(data: ChangePasswordRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if not verify_password(data.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+    current_user.password_hash = get_password_hash(data.new_password)
+    db.add(current_user)
+    await db.commit()
+    return {"message": "Password updated successfully"}
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+@router.post("/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found")
+        
+    # Reset password to campus_id
+    user.password_hash = get_password_hash(user.campus_id)
+    db.add(user)
+    await db.commit()
+    return {"message": "Password reset to Campus ID successfully"}

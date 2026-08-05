@@ -16,6 +16,8 @@ export default function ProfileSettings() {
 
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
+    campus_id: '',
     phone: '',
     department: '',
     course: '',
@@ -33,6 +35,8 @@ export default function ProfileSettings() {
     if (user) {
       setFormData({
         name: user.name || '',
+        email: user.email || '',
+        campus_id: user.campus_id || '',
         phone: user.phone || '',
         department: user.department || '',
         course: user.course || '',
@@ -48,6 +52,8 @@ export default function ProfileSettings() {
     try {
       await api.put('/users/me', {
         name: formData.name,
+        email: formData.email,
+        campus_id: formData.campus_id,
         phone: formData.phone,
         department: formData.department,
         course: formData.course,
@@ -118,26 +124,26 @@ export default function ProfileSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Email Address (Read-only)</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Email Address</label>
                 <Input 
                   icon={Mail}
                   type="email" 
-                  value={user?.email || ''} 
-                  disabled 
-                  className="opacity-60 cursor-not-allowed"
+                  value={formData.email} 
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                  required
                 />
               </div>
 
               {user?.role && user.role.toLowerCase() === 'student' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Campus ID (Read-only)</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5 ml-1">Campus ID</label>
                     <Input 
                       icon={User}
                       type="text" 
-                      value={user?.campus_id || ''} 
-                      disabled 
-                      className="opacity-60 cursor-not-allowed"
+                      value={formData.campus_id} 
+                      onChange={e => setFormData({...formData, campus_id: e.target.value})}
+                      required
                     />
                   </div>
                   <div>

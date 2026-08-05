@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserPlus, User, Lock, Loader2, Building, BookOpen, Layers, Phone } from 'lucide-react';
+import { UserPlus, User, Lock, Loader2, Building, BookOpen, Layers, Phone, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
@@ -78,8 +78,9 @@ export default function StudentRegister() {
       const { confirm_password, ...apiData } = formData;
       // Sanitize campus_id (remove hyphens and spaces)
       apiData.campus_id = apiData.campus_id.replace(/[^a-zA-Z0-9]/g, '');
+      apiData.role_name = 'student';
 
-      const res = await api.post('/auth/register/student', apiData);
+      const res = await api.post('/auth/register', apiData);
       
       // Instead of logging them in directly, redirect to login page
       toast.success("Registration successful! Please login.");

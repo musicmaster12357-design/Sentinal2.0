@@ -61,3 +61,5 @@ class UserProfileUpdate(BaseModel):
     course: Optional[str] = None
     specialisation: Optional[str] = None
     semester: Optional[str] = None
+    email: Optional[EmailStr] = None
+    campus_id: Optional[str] = None

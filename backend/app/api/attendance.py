@@ -75,7 +75,7 @@ async def scan_qr(data: QRScanRequest, db: AsyncSession = Depends(get_db), curre
             "specialisation": None,
             "semester": None,
             "campus_id": current_user.campus_id,
-            "time": (record.timestamp.replace(microsecond=0).isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.replace(microsecond=0).isoformat() if record.timestamp else None),
+            "time": (record.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(record.timestamp, "tzinfo", None) else "")) if record.timestamp else None,
             "status": record.status,
             "interactive_rating": detail.interactive_rating,
             "relevant_rating": detail.relevant_rating,
@@ -162,7 +162,7 @@ async def manual_checkin(session_id: int, data: ManualAttendanceRequest, db: Asy
         "specialisation": student.profile.specialisation if student.profile else None,
         "semester": student.profile.semester_name if student.profile else None,
         "campus_id": student.campus_id,
-        "time": (record.timestamp.replace(microsecond=0).isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.replace(microsecond=0).isoformat() if record.timestamp else None),
+        "time": (record.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(record.timestamp, "tzinfo", None) else "")) if record.timestamp else None,
         "status": record.status,
         "interactive_rating": detail.interactive_rating,
         "relevant_rating": detail.relevant_rating,
@@ -271,7 +271,7 @@ async def submit_feedback(data: SessionFormRequest, db: AsyncSession = Depends(g
             "specialisation": student.profile.specialisation if student and student.profile else None,
             "semester": student.profile.semester_name if student and student.profile else None,
             "campus_id": student.campus_id if student else None,
-            "time": (record.timestamp.replace(microsecond=0).isoformat() + "Z") if record.timestamp and not record.timestamp.tzinfo else (record.timestamp.replace(microsecond=0).isoformat() if record.timestamp else None),
+            "time": (record.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(record.timestamp, "tzinfo", None) else "")) if record.timestamp else None,
             "status": record.status,
             "interactive_rating": detail.interactive_rating,
             "relevant_rating": detail.relevant_rating,
@@ -307,9 +307,9 @@ async def get_attendance_history(db: AsyncSession = Depends(get_db), current_use
             "session_id": session.id,
             "title": session.title or f"Session {session.id}",
             "subject": str(session.subject_id) if session.subject_id else "General",
-            "date": session.start_time.replace(microsecond=0).isoformat() if session.start_time else None,
+            "date": (session.start_time.replace(microsecond=0).isoformat() + ("Z" if not getattr(session.start_time, "tzinfo", None) else "")) if session.start_time else None,
             "status": record.status,
-            "timestamp": record.timestamp.replace(microsecond=0).isoformat() if record.timestamp else None
+            "timestamp": (record.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(record.timestamp, "tzinfo", None) else "")) if record.timestamp else None
         })
         
     from sqlalchemy import func
@@ -356,7 +356,7 @@ async def get_session_state(session_id: int, current_user: User = Depends(get_cu
         "course": "B.Tech", # Mock for now
         "specialisation": "General", # Mock for now
         "semester": "1", # Mock for now
-        "time": (r.timestamp.replace(microsecond=0).isoformat() + "Z") if r.timestamp and not r.timestamp.tzinfo else (r.timestamp.replace(microsecond=0).isoformat() if r.timestamp else None),
+        "time": (r.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(r.timestamp, "tzinfo", None) else "")) if r.timestamp else None,
         "campus_id": s.campus_id,
     } for r, s, d in records]
     
@@ -368,8 +368,8 @@ async def get_session_state(session_id: int, current_user: User = Depends(get_cu
     
     return {
         "qr_token": session.current_qr if session else None,
-        "start_time": session.start_time.replace(microsecond=0).isoformat() if (session and session.start_time) else None,
-        "end_time": session.end_time.replace(microsecond=0).isoformat() if (session and session.end_time) else None,
+        "start_time": (session.start_time.replace(microsecond=0).isoformat() + ("Z" if not getattr(session.start_time, "tzinfo", None) else "")) if (session and session.start_time) else None,
+        "end_time": (session.end_time.replace(microsecond=0).isoformat() + ("Z" if not getattr(session.end_time, "tzinfo", None) else "")) if (session and session.end_time) else None,
         "attendees": attendees
     }
 
@@ -392,8 +392,8 @@ async def get_faculty_sessions(db: AsyncSession = Depends(get_db), current_user:
     return [{
         "id": s.id,
         "subject_id": s.subject_id,
-        "start_time": s.start_time.replace(microsecond=0).isoformat() if s.start_time else None,
-        "end_time": s.end_time.replace(microsecond=0).isoformat() if s.end_time else None,
+        "start_time": (s.start_time.replace(microsecond=0).isoformat() + ("Z" if not getattr(s.start_time, "tzinfo", None) else "")) if s.start_time else None,
+        "end_time": (s.end_time.replace(microsecond=0).isoformat() + ("Z" if not getattr(s.end_time, "tzinfo", None) else "")) if s.end_time else None,
         "status": s.status
     } for s in sessions]
 
@@ -424,7 +424,7 @@ async def get_session_attendees(session_id: int, db: AsyncSession = Depends(get_
         "course": (s.profile.course if s.profile else 'N/A'),
         "specialisation": (s.profile.specialisation if s.profile else 'N/A'),
         "semester": (s.profile.semester if s.profile else 'N/A'),
-        "time": r.timestamp.replace(microsecond=0).isoformat() if r.timestamp else None,
+        "time": (r.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(r.timestamp, "tzinfo", None) else "")) if r.timestamp else None,
         "campus_id": s.campus_id,
         "interactive_rating": d.interactive_rating if d else None,
         "relevant_rating": d.relevant_rating if d else None,
@@ -444,12 +444,15 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: Us
 
     IST = timezone(timedelta(hours=5, minutes=30))
 
-    stmt = select(AttendanceRecord, User, StudentSessionDetail, AttendanceSession).join(
+    from app.models.user import Profile
+    stmt = select(AttendanceRecord, User, StudentSessionDetail, AttendanceSession, Profile).join(
         User, AttendanceRecord.student_id == User.id
     ).join(
         StudentSessionDetail, AttendanceRecord.id == StudentSessionDetail.attendance_id
     ).join(
         AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
+    ).outerjoin(
+        Profile, User.id == Profile.user_id
     ).where(
         AttendanceSession.faculty_id == current_user.id,
         StudentSessionDetail.overall_satisfaction > 0  # Assuming 0 is default/unsubmitted
@@ -466,7 +469,7 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: Us
         return dt.astimezone(IST).replace(microsecond=0).isoformat()
 
     return [{
-        "student_name": (s.profile.name if s.profile else 'N/A'),
+        "student_name": (p.name if p else 'N/A'),
         "campus_id": s.campus_id,
         "session_id": sess.id,
         "subject_id": sess.subject_id,
@@ -478,7 +481,7 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: Us
         "overall_satisfaction": d.overall_satisfaction,
         "submitted_time": to_ist_iso(d.submitted_time),
         "email": s.email,
-        "phone": s.phone,
-        "course": (s.profile.course if s.profile else 'N/A'),
-        "specialisation": (s.profile.specialisation if s.profile else 'N/A')
-    } for r, s, d, sess in records]
+        "phone": p.phone if p else None,
+        "course": (p.course_name if p else 'N/A'),
+        "specialisation": (p.specialisation if p else 'N/A')
+    } for r, s, d, sess, p in records]

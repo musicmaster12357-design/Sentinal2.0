@@ -54,5 +54,10 @@ async def update_my_profile(data: UserProfileUpdate, current_user: User = Depend
     if data.semester is not None:
         profile.semester_name = data.semester
         
+    if data.email is not None:
+        current_user.email = data.email
+    if data.campus_id is not None:
+        current_user.campus_id = data.campus_id
+        
     await db.commit()
     return {"message": "Profile updated successfully"}
