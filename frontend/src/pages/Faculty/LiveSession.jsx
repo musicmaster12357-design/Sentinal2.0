@@ -92,8 +92,10 @@ export default function LiveSession() {
     let pollInterval = null;
 
     const connect = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/attendance/${id}`;
+      const isProd = import.meta.env.MODE === 'production';
+      const wsHost = isProd ? 'sentinal20-production.up.railway.app' : window.location.host;
+      const protocol = isProd ? 'wss:' : (window.location.protocol === 'https:' ? 'wss:' : 'ws:');
+      const wsUrl = `${protocol}//${wsHost}/ws/attendance/${id}`;
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
