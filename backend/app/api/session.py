@@ -221,6 +221,47 @@ async def delete_session(session_id: int, current_user: User = Depends(get_curre
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
 
+@router.get("/debug/schema")
+async def get_db_schema(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        # Get all foreign keys in Postgres that reference attendance_sessions
+        query = text("""
+            SELECT 
+                tc.table_name, kcu.column_name 
+            FROM 
+                information_schema.table_constraints AS tc 
+                JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+            WHERE constraint_type = 'FOREIGN KEY' AND ccu.table_name='attendance_sessions';
+        """)
+        res = await db.execute(query)
+        rows = res.fetchall()
+        
+        # Get all tables referencing attendance
+        query2 = text("""
+            SELECT 
+                tc.table_name, kcu.column_name 
+            FROM 
+                information_schema.table_constraints AS tc 
+                JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+            WHERE constraint_type = 'FOREIGN KEY' AND ccu.table_name='attendance';
+        """)
+        res2 = await db.execute(query2)
+        rows2 = res2.fetchall()
+        
+        return {
+            "referencing_sessions": [{"table": r[0], "column": r[1]} for r in rows],
+            "referencing_attendance": [{"table": r[0], "column": r[1]} for r in rows2]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 @router.get("/{session_id}/ws-url")
 async def get_websocket_url(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
