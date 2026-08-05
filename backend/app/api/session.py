@@ -190,19 +190,25 @@ async def delete_session(session_id: int, current_user: User = Depends(get_curre
     if not session_obj:
         raise HTTPException(status_code=404, detail="Session not found or not yours")
         
-    # Manually delete child records to bypass missing ON DELETE CASCADE constraint in DB
-    att_stmt = select(AttendanceRecord.id).where(AttendanceRecord.session_id == session_id)
-    att_res = await db.execute(att_stmt)
-    attendance_ids = att_res.scalars().all()
-    
-    if attendance_ids:
-        from sqlalchemy import delete
-        await db.execute(delete(StudentSessionDetail).where(StudentSessionDetail.attendance_id.in_(attendance_ids)))
-        await db.execute(delete(AttendanceRecord).where(AttendanceRecord.session_id == session_id))
+    try:
+        # Manually delete child records to bypass missing ON DELETE CASCADE constraint in DB
+        att_stmt = select(AttendanceRecord.id).where(AttendanceRecord.session_id == session_id)
+        att_res = await db.execute(att_stmt)
+        attendance_ids = att_res.scalars().all()
         
-    await db.delete(session_obj)
-    await db.commit()
-    return {"message": "Session deleted successfully"}
+        if attendance_ids:
+            from sqlalchemy import delete
+            await db.execute(delete(StudentSessionDetail).where(StudentSessionDetail.attendance_id.in_(attendance_ids)))
+            await db.execute(delete(AttendanceRecord).where(AttendanceRecord.session_id == session_id))
+            
+        await db.delete(session_obj)
+        await db.commit()
+        return {"message": "Session deleted successfully"}
+    except Exception as e:
+        await db.rollback()
+        import traceback
+        err_msg = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)} | Trace: {err_msg}")
 
 @router.get("/{session_id}/ws-url")
 async def get_websocket_url(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
