@@ -54,6 +54,21 @@ async def startup_event():
             db.add(new_admin)
             await db.commit()
 
+    import asyncio
+    import urllib.request
+    
+    async def keep_alive():
+        while True:
+            await asyncio.sleep(180) # Every 3 minutes
+            try:
+                def ping():
+                    urllib.request.urlopen("https://sentinal20-production.up.railway.app/", timeout=10)
+                await asyncio.to_thread(ping)
+            except Exception:
+                pass
+
+    asyncio.create_task(keep_alive())
+
 # CORS configuration
 origins = [
     "*",
