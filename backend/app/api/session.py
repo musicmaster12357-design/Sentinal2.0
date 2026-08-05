@@ -212,12 +212,12 @@ async def delete_session(session_id: int, current_user: User = Depends(get_curre
             await db.execute(del_att, {"sid": session_id})
             
         # 4. Finally delete the session itself
-        await db.delete(session_obj)
+        del_sess = text("DELETE FROM attendance_sessions WHERE id = :sid")
+        await db.execute(del_sess, {"sid": session_id})
         await db.commit()
         return {"message": "Session deleted successfully"}
         
     except Exception as e:
-        await db.rollback()
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
 
