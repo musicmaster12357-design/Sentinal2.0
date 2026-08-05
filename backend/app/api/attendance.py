@@ -68,12 +68,12 @@ async def scan_qr(data: QRScanRequest, db: AsyncSession = Depends(get_db), curre
 
         await manager.broadcast_attendance_update(session.id, {
             "student_id": current_user.id,
-            "name": student.profile.name if student and student.profile else "Unknown",
+            "name": student.profile.name if (student and student.profile and student.profile.name) else None,
             "email": current_user.email,
-            "department": None,
-            "course": None,
-            "specialisation": None,
-            "semester": None,
+            "department": student.profile.department_name if (student and student.profile) else None,
+            "course": student.profile.course_name if (student and student.profile) else None,
+            "specialisation": student.profile.specialisation if (student and student.profile) else None,
+            "semester": student.profile.semester_name if (student and student.profile) else None,
             "campus_id": current_user.campus_id,
             "time": (record.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(record.timestamp, "tzinfo", None) else "")) if record.timestamp else None,
             "status": record.status,
@@ -350,12 +350,12 @@ async def get_session_state(session_id: int, current_user: User = Depends(get_cu
     
     attendees = [{
         "student_id": s.id,
-        "name": s.profile.name if s.profile else "Unknown",
+        "name": s.profile.name if (s.profile and s.profile.name) else None,
         "email": s.email,
-        "department": "CS", # Mock for now
-        "course": "B.Tech", # Mock for now
-        "specialisation": "General", # Mock for now
-        "semester": "1", # Mock for now
+        "department": s.profile.department_name if s.profile else None,
+        "course": s.profile.course_name if s.profile else None,
+        "specialisation": s.profile.specialisation if s.profile else None,
+        "semester": s.profile.semester_name if s.profile else None,
         "time": (r.timestamp.replace(microsecond=0).isoformat() + ("Z" if not getattr(r.timestamp, "tzinfo", None) else "")) if r.timestamp else None,
         "campus_id": s.campus_id,
     } for r, s, d in records]

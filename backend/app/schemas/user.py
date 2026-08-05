@@ -22,6 +22,10 @@ class UserCreate(BaseModel):
     campus_id: str
     role_name: str
     phone: Optional[str] = None
+    department: Optional[str] = None
+    course: Optional[str] = None
+    specialisation: Optional[str] = None
+    semester: Optional[str] = None
 
 class ProfileResponse(BaseModel):
     name: str

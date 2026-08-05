@@ -91,7 +91,11 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     profile = Profile(
         user_id=new_user.id,
         name=data.name,
-        phone=data.phone
+        phone=data.phone,
+        department_name=data.department,
+        course_name=data.course,
+        specialisation=data.specialisation,
+        semester_name=data.semester
     )
     db.add(profile)
     
