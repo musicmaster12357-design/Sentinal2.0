@@ -134,8 +134,10 @@ export default function FacultyFeedback() {
                         link.download = `Feedbacks_${selectedDate}.xlsx`;
                         document.body.appendChild(link);
                         link.click();
-                        window.URL.revokeObjectURL(url);
-                        link.remove();
+                        setTimeout(() => {
+                          window.URL.revokeObjectURL(url);
+                          link.remove();
+                        }, 200);
                       } catch (err) {
                         alert("Failed to download feedback excel.");
                       }

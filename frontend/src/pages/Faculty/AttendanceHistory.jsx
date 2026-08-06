@@ -68,8 +68,10 @@ export default function AttendanceHistory() {
       link.download = `Attendance_${selectedDate}_${exportOption}.xlsx`;
       document.body.appendChild(link);
       link.click();
-      window.URL.revokeObjectURL(url);
-      link.remove();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        link.remove();
+      }, 200);
     } catch (err) {
       console.error("Failed to download excel", err);
       alert("Failed to download excel sheet.");
@@ -90,8 +92,10 @@ export default function AttendanceHistory() {
       link.download = `Consolidated_Daily_Attendance_${exportOption}.xlsx`;
       document.body.appendChild(link);
       link.click();
-      window.URL.revokeObjectURL(url);
-      link.remove();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        link.remove();
+      }, 200);
     } catch (err) {
       console.error("Failed to download consolidated excel", err);
       alert("Failed to download consolidated excel sheet.");
@@ -278,8 +282,10 @@ export default function AttendanceHistory() {
                                               link.download = `Feedback_Session_${timeStr}.xlsx`;
                                               document.body.appendChild(link);
                                               link.click();
-                                              window.URL.revokeObjectURL(url);
-                                              link.remove();
+                                              setTimeout(() => {
+                                                window.URL.revokeObjectURL(url);
+                                                link.remove();
+                                              }, 200);
                                             } catch (err) {
                                               console.error("Failed to download feedback", err);
                                               alert("Failed to download feedback excel.");
