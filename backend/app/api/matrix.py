@@ -478,10 +478,10 @@ async def export_feedback_excel_by_date(
     
     # Group by session_id
     grouped_feedbacks = {}
-    for user_obj, feedback, sess_id in records:
+    for user_obj, feedback, sess_id, profile_obj in records:
         if sess_id not in grouped_feedbacks:
             grouped_feedbacks[sess_id] = []
-        grouped_feedbacks[sess_id].append((user_obj, feedback))
+        grouped_feedbacks[sess_id].append((user_obj, feedback, profile_obj))
         
     wb = openpyxl.Workbook()
     
@@ -527,7 +527,7 @@ async def export_feedback_excel_by_date(
                 
             ws.row_dimensions[1].height = 25
             
-            for i, (user_obj, feedback) in enumerate(items, 1):
+            for i, (user_obj, feedback, profile_obj) in enumerate(items, 1):
                 row_num = i + 1
                 sub_time = "N/A"
                 if feedback.submitted_time:
@@ -539,7 +539,7 @@ async def export_feedback_excel_by_date(
                 row_data = [
                     i,
                     user_obj.campus_id,
-                    (user_obj.profile.name if user_obj.profile else 'N/A'),
+                    (profile_obj.name if profile_obj else 'N/A'),
                     f"{feedback.interactive_rating}/5" if feedback.interactive_rating else "N/A",
                     f"{feedback.relevant_rating}/5" if feedback.relevant_rating else "N/A",
                     feedback.learned_today or "N/A",
