@@ -458,30 +458,34 @@ async def get_all_feedbacks(db: AsyncSession = Depends(get_db), current_user: Us
         StudentSessionDetail.overall_satisfaction > 0  # Assuming 0 is default/unsubmitted
     ).order_by(StudentSessionDetail.submitted_time.desc())
 
-    res = await db.execute(stmt)
-    records = res.all()
+    try:
+        res = await db.execute(stmt)
+        records = res.all()
 
-    def to_ist_iso(dt):
-        if not dt: return None
-        # SQLite stores naive datetimes which are actually UTC
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(IST).replace(microsecond=0).isoformat()
+        def to_ist_iso(dt):
+            if not dt: return None
+            # SQLite stores naive datetimes which are actually UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(IST).replace(microsecond=0).isoformat()
 
-    return [{
-        "student_name": (p.name if p else 'N/A'),
-        "campus_id": s.campus_id,
-        "session_id": sess.id,
-        "subject_id": sess.subject_id,
-        "session_date": to_ist_iso(sess.start_time),
-        "interactive_rating": d.interactive_rating,
-        "relevant_rating": d.relevant_rating,
-        "learned_today": d.learned_today,
-        "key_takeaway": d.key_takeaway,
-        "overall_satisfaction": d.overall_satisfaction,
-        "submitted_time": to_ist_iso(d.submitted_time),
-        "email": s.email,
-        "phone": p.phone if p else None,
-        "course": (p.course_name if p else 'N/A'),
-        "specialisation": (p.specialisation if p else 'N/A')
-    } for r, s, d, sess, p in records]
+        return [{
+            "student_name": (p.name if p else 'N/A'),
+            "campus_id": s.campus_id,
+            "session_id": sess.id,
+            "subject_id": sess.subject_id,
+            "session_date": to_ist_iso(sess.start_time),
+            "interactive_rating": d.interactive_rating,
+            "relevant_rating": d.relevant_rating,
+            "learned_today": d.learned_today,
+            "key_takeaway": d.key_takeaway,
+            "overall_satisfaction": d.overall_satisfaction,
+            "submitted_time": to_ist_iso(d.submitted_time),
+            "email": s.email,
+            "phone": p.phone if p else None,
+            "course": (p.course_name if p else 'N/A'),
+            "specialisation": (p.specialisation if p else 'N/A')
+        } for r, s, d, sess, p in records]
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=str(e) + "\n" + traceback.format_exc())
