@@ -16,8 +16,19 @@ function SessionTimings({ startTime, endTime }) {
       }
       let d = new Date(cleanStr);
       if (isNaN(d.getTime()) && typeof cleanStr === 'string') {
-        // Fallback for strict browsers: replace +00:00 with Z
-        d = new Date(cleanStr.replace('+00:00', 'Z'));
+        // Fallback for Safari which doesn't support +05:30
+        const timezoneMatch = cleanStr.match(/([+-])(\d{2}):(\d{2})$/);
+        if (timezoneMatch) {
+            // Strip the unsupported timezone and parse as local, 
+            // but wait, if it was UTC, we just replace it with Z
+            if (timezoneMatch[0] === '+00:00' || timezoneMatch[0] === '-00:00') {
+                d = new Date(cleanStr.replace(timezoneMatch[0], 'Z'));
+            } else {
+                // If it's a non-UTC offset, Safari will still fail, so we strip it 
+                // and pretend it's already local time (approximate fallback)
+                d = new Date(cleanStr.replace(timezoneMatch[0], ''));
+            }
+        }
       }
       if (isNaN(d.getTime())) return timeStr;
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
