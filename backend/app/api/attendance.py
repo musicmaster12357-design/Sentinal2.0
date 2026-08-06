@@ -402,6 +402,7 @@ async def get_session_attendees(session_id: int, db: AsyncSession = Depends(get_
     from app.models.attendance import AttendanceRecord
     from app.models.user import User
     from app.models.student_session_detail import StudentSessionDetail
+    from sqlalchemy.orm import selectinload
     
     stmt = select(AttendanceRecord, User, StudentSessionDetail).join(
         User, AttendanceRecord.student_id == User.id
