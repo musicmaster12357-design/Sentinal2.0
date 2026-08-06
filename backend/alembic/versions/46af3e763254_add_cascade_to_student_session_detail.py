@@ -27,7 +27,28 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('key')
     )
     op.create_index(op.f('ix_system_settings_key'), 'system_settings', ['key'], unique=False)
-    op.drop_constraint(None, 'student_session_details', type_='foreignkey')
+    # On Postgres, drop_constraint requires the exact constraint name.
+    # We execute raw SQL to drop the constraint safely.
+    import os
+    if os.environ.get("DATABASE_URL", "").startswith("postgres"):
+        op.execute(
+            """
+            DO $$ DECLARE
+                r RECORD;
+            BEGIN
+                FOR r IN (SELECT constraint_name 
+                          FROM information_schema.table_constraints 
+                          WHERE table_name='student_session_details' AND constraint_type='FOREIGN KEY') 
+                LOOP
+                    EXECUTE 'ALTER TABLE student_session_details DROP CONSTRAINT ' || quote_ident(r.constraint_name);
+                END LOOP;
+            END $$;
+            """
+        )
+    else:
+        # For SQLite batch mode or other
+        with op.batch_alter_table('student_session_details') as batch_op:
+            batch_op.drop_constraint('student_session_details_attendance_id_fkey', type_='foreignkey')
     op.create_foreign_key(None, 'student_session_details', 'attendance', ['attendance_id'], ['id'], ondelete='CASCADE')
     # ### end Alembic commands ###
 
