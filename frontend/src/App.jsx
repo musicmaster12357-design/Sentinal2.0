@@ -21,7 +21,7 @@ import { ToastContainer } from './components/ui/Toast';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/attendance">
       <ToastContainer />
       <Routes>
         <Route path="/" element={<Landing />} />
